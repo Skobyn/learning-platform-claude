@@ -1,0 +1,204 @@
+name: Release Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      create_tag:
+        description: 'Create Git tag'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏷️ Create Git tag
+        if: github.event.inputs.create_tag == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          VERSION="v${{ github.event.inputs.version }}"
+          git tag -a ${VERSION} -m "Release ${VERSION}"
+          git push origin ${VERSION}
+
+      - name: 📝 Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          # Generate changelog
+          CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          
+          # Categorize changes
+          FEATURES=$(echo "$CHANGELOG" | grep -E "^- (feat|feature)" || true)
+          FIXES=$(echo "$CHANGELOG" | grep -E "^- (fix|bugfix)" || true)
+          DOCS=$(echo "$CHANGELOG" | grep -E "^- (docs|documentation)" || true)
+          OTHERS=$(echo "$CHANGELOG" | grep -vE "^- (feat|feature|fix|bugfix|docs|documentation)" || true)
+          
+          # Create formatted changelog
+          {
+            echo "CHANGELOG<<EOF"
+            echo "## 📋 Changelog"
+            echo ""
+            
+            if [ -n "$FEATURES" ]; then
+              echo "### ✨ Features"
+              echo "$FEATURES"
+              echo ""
+            fi
+            
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+            
+            if [ -n "$DOCS" ]; then
+              echo "### 📚 Documentation"
+              echo "$DOCS"
+              echo ""
+            fi
+            
+            if [ -n "$OTHERS" ]; then
+              echo "### 🔧 Other Changes"
+              echo "$OTHERS"
+              echo ""
+            fi
+            
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: 🏗️ Build application
+        run: npm run build
+
+      - name: 📦 Create release artifacts
+        run: |
+          # Create release directory
+          mkdir -p release
+          
+          # Copy built files
+          cp -r .next/standalone/* release/
+          cp -r .next/static release/.next/
+          cp -r public release/
+          
+          # Create archive
+          tar -czf learning-platform-v${{ github.event.inputs.version }}.tar.gz release/
+          zip -r learning-platform-v${{ github.event.inputs.version }}.zip release/
+
+      - name: 🚀 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
+          body: |
+            ## 🎉 Learning Platform v${{ github.event.inputs.version }}
+            
+            Release Type: **${{ github.event.inputs.release_type }}**
+            
+            ${{ steps.changelog.outputs.CHANGELOG }}
+            
+            ## 📦 Installation
+            
+            ### Docker
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:v${{ github.event.inputs.version }}
+            docker run -p 3000:3000 ghcr.io/${{ github.repository }}:v${{ github.event.inputs.version }}
+            ```
+            
+            ### Manual
+            1. Download the release archive
+            2. Extract the files
+            3. Set up environment variables
+            4. Run `npm start`
+            
+            ## 🔗 Links
+            - [Documentation](https://github.com/${{ github.repository }}/wiki)
+            - [Issues](https://github.com/${{ github.repository }}/issues)
+            - [Discussions](https://github.com/${{ github.repository }}/discussions)
+          files: |
+            learning-platform-v${{ github.event.inputs.version }}.tar.gz
+            learning-platform-v${{ github.event.inputs.version }}.zip
+          draft: false
+          prerelease: false
+
+      - name: 🐳 Build and push Docker image
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          IMAGE_NAME=ghcr.io/${{ github.repository }}
+          VERSION=${{ github.event.inputs.version }}
+          
+          docker build \
+            --build-arg VERSION=${VERSION} \
+            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            --build-arg VCS_REF=${{ github.sha }} \
+            -t ${IMAGE_NAME}:${VERSION} \
+            -t ${IMAGE_NAME}:latest \
+            .
+          
+          docker push ${IMAGE_NAME}:${VERSION}
+          docker push ${IMAGE_NAME}:latest
+
+      - name: 📊 Update version in package.json
+        run: |
+          npm version ${{ github.event.inputs.version }} --no-git-tag-version
+          
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to ${{ github.event.inputs.version }}"
+          git push
+
+      - name: 🔔 Notify team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            🚀 New Release Published!
+            Version: v${{ github.event.inputs.version }}
+            Type: ${{ github.event.inputs.release_type }}
+            Released by: ${{ github.actor }}
+            
+            Download: https://github.com/${{ github.repository }}/releases/tag/v${{ github.event.inputs.version }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

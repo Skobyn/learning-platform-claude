@@ -1,0 +1,474 @@
+// Prisma Schema for Enterprise Learning Platform
+// This schema follows the pseudocode design and supports all major features
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  emailVerified     DateTime?
+  firstName         String
+  lastName          String
+  hashedPassword    String
+  role              Role     @default(LEARNER)
+  profilePicture    String?
+  bio               String?
+  isActive          Boolean  @default(true)
+  requires2FA       Boolean  @default(false)
+  lastLogin         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Organization relationship
+  organizationId    String?
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  
+  // User preferences
+  preferences       UserPreferences?
+  
+  // Learning data
+  enrollments       Enrollment[]
+  progress          Progress[]
+  achievements      Achievement[]
+  quizAttempts      QuizAttempt[]
+  
+  // Content creation (for instructors)
+  createdCourses    Course[] @relation("CourseCreator")
+  createdQuizzes    Quiz[]   @relation("QuizCreator")
+  
+  // Session management
+  sessions          UserSession[]
+  
+  // Notifications
+  notifications     Notification[]
+  
+  @@map("users")
+}
+
+model UserPreferences {
+  id                      String @id @default(cuid())
+  userId                  String @unique
+  user                    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  language                String @default("en")
+  timezone                String @default("UTC")
+  
+  // Notification preferences
+  emailNotifications      Boolean @default(true)
+  pushNotifications       Boolean @default(true)
+  inAppNotifications      Boolean @default(true)
+  courseUpdates          Boolean @default(true)
+  assessmentReminders    Boolean @default(true)
+  achievementAlerts      Boolean @default(true)
+  
+  // Learning preferences
+  learningStyle          LearningStyle @default(VISUAL)
+  difficultyPreference   Difficulty @default(BEGINNER)
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@map("user_preferences")
+}
+
+model Organization {
+  id          String @id @default(cuid())
+  name        String
+  code        String @unique
+  domain      String?
+  logo        String?
+  settings    Json?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+  courses     Course[]
+  
+  @@map("organizations")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@map("user_sessions")
+}
+
+// Course Management
+model Course {
+  id                String   @id @default(cuid())
+  title             String
+  description       String
+  objectives        String[]
+  status            CourseStatus @default(DRAFT)
+  category          String
+  difficulty        Difficulty
+  estimatedDuration Int      // in minutes
+  tags              String[]
+  price             Float    @default(0)
+  currency          String   @default("USD")
+  thumbnailUrl      String?
+  isAIGenerated     Boolean  @default(false)
+  
+  // Relationships
+  createdBy         String
+  creator           User     @relation("CourseCreator", fields: [createdBy], references: [id])
+  organizationId    String?
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  
+  // Course content
+  modules           Module[]
+  
+  // Learning data
+  enrollments       Enrollment[]
+  
+  // Metadata
+  enrollmentCount   Int      @default(0)
+  averageRating     Float    @default(0)
+  publishedAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("courses")
+}
+
+model Module {
+  id                String   @id @default(cuid())
+  courseId          String
+  course            Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  title             String
+  description       String
+  objectives        String[]
+  orderIndex        Int
+  estimatedDuration Int      // in minutes
+  prerequisites     String[] // Module IDs
+  
+  // Content
+  lessons           Lesson[]
+  quiz              Quiz?
+  
+  // Progress tracking
+  progress          Progress[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("modules")
+}
+
+model Lesson {
+  id                String      @id @default(cuid())
+  moduleId          String
+  module            Module      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  title             String
+  content           String      // Rich text content
+  contentType       ContentType @default(TEXT)
+  orderIndex        Int
+  keyPoints         String[]
+  estimatedDuration Int         // in minutes
+  
+  // Media
+  videoUrl          String?
+  attachments       String[]    // File URLs
+  
+  // Resources
+  resources         Resource[]
+  
+  // Progress tracking
+  progress          Progress[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("lessons")
+}
+
+model Resource {
+  id          String       @id @default(cuid())
+  lessonId    String
+  lesson      Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  title       String
+  type        ResourceType
+  url         String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  
+  @@map("resources")
+}
+
+// Assessment System
+model Quiz {
+  id                      String  @id @default(cuid())
+  moduleId                String  @unique
+  module                  Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  title                   String
+  description             String
+  passingScore            Int     @default(70)
+  timeLimit              Int?    // in minutes
+  maxAttempts            Int     @default(3)
+  showResultsImmediately Boolean @default(true)
+  allowReview            Boolean @default(true)
+  
+  // Relationships
+  createdBy              String
+  creator                User    @relation("QuizCreator", fields: [createdBy], references: [id])
+  
+  questions              Question[]
+  attempts               QuizAttempt[]
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@map("quizzes")
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  quizId        String
+  quiz          Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  text          String
+  type          QuestionType
+  options       String[]     // For multiple choice
+  correctAnswer Json         // Flexible format for different question types
+  explanation   String
+  points        Int          @default(1)
+  difficulty    QuestionDifficulty @default(MEDIUM)
+  orderIndex    Int
+  
+  responses     QuestionResponse[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("questions")
+}
+
+model QuizAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  score       Float?
+  passed      Boolean  @default(false)
+  timeSpent   Int?     // in seconds
+  
+  responses   QuestionResponse[]
+  
+  startedAt   DateTime @default(now())
+  submittedAt DateTime?
+  
+  @@map("quiz_attempts")
+}
+
+model QuestionResponse {
+  id         String      @id @default(cuid())
+  attemptId  String
+  attempt    QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  answer     Json        // Flexible format for different answer types
+  isCorrect  Boolean
+  pointsEarned Int       @default(0)
+  
+  submittedAt DateTime @default(now())
+  
+  @@map("question_responses")
+}
+
+// Progress Tracking
+model Enrollment {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  status          EnrollmentStatus @default(ACTIVE)
+  progress        Float            @default(0) // Percentage
+  certificateIssued Boolean        @default(false)
+  
+  enrolledAt      DateTime         @default(now())
+  completedAt     DateTime?
+  lastAccessedAt  DateTime?
+  
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Progress {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId             String
+  lesson               Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  moduleId             String
+  module               Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  completionPercentage Float    @default(0)
+  timeSpent           Int      @default(0) // in minutes
+  notes               String?
+  
+  startedAt           DateTime?
+  completedAt         DateTime?
+  lastAccessedAt      DateTime @default(now())
+  
+  @@unique([userId, lessonId])
+  @@map("progress")
+}
+
+// Gamification & Achievements
+model Achievement {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type            AchievementType
+  title           String
+  description     String
+  level           BadgeLevel
+  courseId        String?         // Optional - for course-specific achievements
+  verificationCode String?        // For blockchain verification
+  
+  earnedAt        DateTime        @default(now())
+  expiresAt       DateTime?
+  
+  @@map("achievements")
+}
+
+// Notification System
+model Notification {
+  id        String             @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?              // Additional notification data
+  
+  isRead    Boolean            @default(false)
+  emailSent Boolean            @default(false)
+  pushSent  Boolean            @default(false)
+  
+  createdAt DateTime           @default(now())
+  readAt    DateTime?
+  
+  @@map("notifications")
+}
+
+// Analytics & Reporting
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?  // Optional - can track anonymous events
+  eventType String
+  data      Json
+  metadata  Json?
+  sessionId String?
+  
+  timestamp DateTime @default(now())
+  
+  @@map("analytics_events")
+}
+
+// Enums
+enum Role {
+  LEARNER
+  INSTRUCTOR
+  ADMIN
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ContentType {
+  TEXT
+  VIDEO
+  INTERACTIVE
+  DOCUMENT
+}
+
+enum ResourceType {
+  LINK
+  DOCUMENT
+  VIDEO
+  BOOK
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+  ESSAY
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  SUSPENDED
+  WITHDRAWN
+}
+
+enum AchievementType {
+  BADGE
+  CERTIFICATE
+  MILESTONE
+}
+
+enum BadgeLevel {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+enum LearningStyle {
+  VISUAL
+  AUDITORY
+  KINESTHETIC
+  READING_WRITING
+}
+
+enum NotificationType {
+  COURSE_UPDATE
+  ASSESSMENT_REMINDER
+  ACHIEVEMENT_EARNED
+  ENROLLMENT_CONFIRMATION
+  COURSE_COMPLETED
+  SYSTEM_ANNOUNCEMENT
+}

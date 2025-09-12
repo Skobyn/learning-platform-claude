@@ -1,0 +1,10 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'Dockerfile.simple', '-t', 'us-central1-docker.pkg.dev/rds-lms/learning-platform/learning-platform:latest', '.']
+  
+  # Push the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/rds-lms/learning-platform/learning-platform:latest']
+
+timeout: 1200s
