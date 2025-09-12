@@ -21,12 +21,9 @@ export default function LoginPage() {
     setError('')
 
     try {
-      const result = await authService.login({
-        email: formData.email,
-        password: formData.password
-      })
+      const result = await authService.login(formData.email, formData.password)
 
-      if (result.success) {
+      if (result && result.success) {
         // Check if 2FA is required
         if (result.requiresTwoFactor) {
           router.push(`/auth/two-factor?email=${encodeURIComponent(formData.email)}`)

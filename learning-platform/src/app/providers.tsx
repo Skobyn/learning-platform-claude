@@ -29,7 +29,7 @@ export function Providers({ children, session }: ProvidersProps) {
   }));
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={session ?? null}>
       <QueryClientProvider client={queryClient}>
         <NextThemesProvider
           attribute="class"

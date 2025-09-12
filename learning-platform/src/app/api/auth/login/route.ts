@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Attempt login
-    const result = await authService.login({ email, password })
+    const result = await authService.login(email, password)
     
     if (!result.success) {
       return NextResponse.json(

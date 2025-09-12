@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: 'Key parameter required' }, { status: 400 });
         }
         
-        const value = await cacheService.get(key, { namespace });
+        const value = await cacheService.get(key, namespace ? { namespace } : {});
         return NextResponse.json({ 
           key, 
           value, 
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: 'Key parameter required' }, { status: 400 });
         }
         
-        const exists = await cacheService.exists(key, { namespace });
+        const exists = await cacheService.exists(key, namespace ? { namespace } : {});
         return NextResponse.json({ key, exists, namespace: namespace || 'default' });
 
       case 'ttl':
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: 'Key parameter required' }, { status: 400 });
         }
         
-        const ttl = await cacheService.ttl(key, { namespace });
+        const ttl = await cacheService.ttl(key, namespace ? { namespace } : {});
         return NextResponse.json({ 
           key, 
           ttl, 
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Key parameter required' }, { status: 400 });
         }
         
-        const deleted = await cacheService.delete(key, { namespace });
+        const deleted = await cacheService.delete(key, namespace ? { namespace } : {});
         return NextResponse.json({ success: deleted, key, namespace: namespace || 'default' });
 
       case 'expire':
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Key and ttl parameters required' }, { status: 400 });
         }
         
-        const expired = await cacheService.expire(key, ttl, { namespace });
+        const expired = await cacheService.expire(key, ttl, namespace ? { namespace } : {});
         return NextResponse.json({ success: expired, key, ttl, namespace: namespace || 'default' });
 
       case 'invalidate_by_tags':

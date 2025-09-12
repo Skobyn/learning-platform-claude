@@ -5,11 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { TopicTiles } from '@/components/learner/TopicTiles';
-import { CourseCard } from '@/components/learner/CourseCard';
+import CourseCard from '@/components/learner/CourseCard';
 import { ProgressTracker } from '@/components/learner/ProgressTracker';
 import { BadgeShowcase } from '@/components/learner/BadgeShowcase';
 import { RecommendedCourses } from '@/components/learner/RecommendedCourses';
 import { LearningPath } from '@/components/learner/LearningPath';
+import { CourseLevel } from '@/types';
 import { 
   BookOpen, 
   TrendingUp, 
@@ -279,7 +280,16 @@ export default function LearnDashboard() {
                 </button>
               </div>
               <Suspense fallback={<div className="h-64 bg-white rounded-lg animate-pulse"></div>}>
-                <LearningPath />
+                <LearningPath learningPath={{
+                  id: '1',
+                  name: 'Full Stack Development',
+                  description: 'Master modern web development',
+                  courses: [],
+                  estimatedDuration: 120,
+                  difficulty: CourseLevel.INTERMEDIATE,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                }} />
               </Suspense>
             </section>
 
@@ -295,7 +305,7 @@ export default function LearnDashboard() {
                 </button>
               </div>
               <Suspense fallback={<div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="h-48 bg-white rounded-lg animate-pulse"></div><div className="h-48 bg-white rounded-lg animate-pulse"></div></div>}>
-                <RecommendedCourses />
+                <RecommendedCourses recommendations={[]} />
               </Suspense>
             </section>
           </div>
@@ -304,12 +314,19 @@ export default function LearnDashboard() {
           <div className="space-y-6">
             {/* Progress Tracker */}
             <Suspense fallback={<div className="h-64 bg-white rounded-lg animate-pulse"></div>}>
-              <ProgressTracker />
+              <ProgressTracker 
+                enrollments={[]}
+                totalLearningTime={0}
+                weeklyGoal={10}
+                weeklyProgress={0}
+                streak={0}
+                badgesEarned={0}
+              />
             </Suspense>
 
             {/* Badge Showcase */}
             <Suspense fallback={<div className="h-48 bg-white rounded-lg animate-pulse"></div>}>
-              <BadgeShowcase />
+              <BadgeShowcase userBadges={[]} />
             </Suspense>
 
             {/* Recent Activity */}

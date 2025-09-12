@@ -542,7 +542,7 @@ export function BulkImport() {
                           <div className="flex items-center space-x-2">
                             <span className="text-sm font-medium">{field.label}</span>
                             {field.required && (
-                              <Badge className="bg-red-100 text-red-800" size="sm">Required</Badge>
+                              <Badge className="bg-red-100 text-red-800">Required</Badge>
                             )}
                           </div>
                           <span className="text-sm text-gray-500">{field.example}</span>
@@ -644,7 +644,7 @@ export function BulkImport() {
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">{targetField.label}</span>
                           {targetField.required && (
-                            <Badge className="bg-red-100 text-red-800" size="sm">Required</Badge>
+                            <Badge className="bg-red-100 text-red-800">Required</Badge>
                           )}
                         </div>
                       </div>
@@ -760,7 +760,7 @@ export function BulkImport() {
                   </div>
                   
                   <div className="pt-4">
-                    <Button onClick={handleImport} disabled={selectedFile.invalidRecords > 0}>
+                    <Button onClick={handleImport} disabled={(selectedFile.invalidRecords || 0) > 0}>
                       <Play className="h-4 w-4 mr-2" />
                       Import Valid Records Only
                     </Button>

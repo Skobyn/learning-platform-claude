@@ -48,7 +48,7 @@ import {
   Search,
   Filter,
   RefreshCw,
-  CloudUpload,
+  Cloud,
   HardDrive,
   Zap,
   Play,
@@ -523,7 +523,7 @@ export function MediaManager() {
                 </p>
                 <p className="text-sm text-gray-500 mt-1">This month</p>
               </div>
-              <CloudUpload className="h-8 w-8 text-orange-600" />
+              <Cloud className="h-8 w-8 text-orange-600" />
             </div>
           </CardContent>
         </Card>
@@ -645,7 +645,7 @@ export function MediaManager() {
           >
             <CardContent className="p-12">
               <div className="text-center">
-                <CloudUpload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <Cloud className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg font-medium text-gray-900">
                   Drop files here to upload
                 </p>

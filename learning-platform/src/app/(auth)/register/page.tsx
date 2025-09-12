@@ -56,14 +56,17 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await authService.register({
+      const registerData: any = {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
-        role: formData.role,
-        organizationCode: formData.organizationCode || undefined
-      })
+        role: formData.role as 'LEARNER' | 'INSTRUCTOR' | 'ADMIN'
+      };
+      if (formData.organizationCode) {
+        registerData.organizationCode = formData.organizationCode;
+      }
+      const result = await authService.register(registerData)
 
       if (result.success) {
         router.push('/auth/verify-email?email=' + encodeURIComponent(formData.email))

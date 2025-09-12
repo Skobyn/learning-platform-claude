@@ -518,10 +518,10 @@ export function AnalyticsDashboard() {
             </CardHeader>
             <CardContent>
               <Chart
-                type="multiline"
+                type="line"
                 data={engagementData}
                 xKey="month"
-                yKeys={['activeUsers', 'newEnrollments', 'completedCourses']}
+                yKey="activeUsers"
                 className="h-80"
               />
             </CardContent>
@@ -576,10 +576,10 @@ export function AnalyticsDashboard() {
             </CardHeader>
             <CardContent>
               <Chart
-                type="stacked-bar"
+                type="bar"
                 data={revenueData}
                 xKey="month"
-                yKeys={['subscriptions', 'oneTime']}
+                yKey="subscriptions"
                 className="h-64"
               />
             </CardContent>
@@ -598,7 +598,7 @@ export function AnalyticsDashboard() {
               <div className="space-y-4">
                 {learnerJourney.map((stage, index) => {
                   const isLast = index === learnerJourney.length - 1;
-                  const width = (stage.users / learnerJourney[0].users) * 100;
+                  const width = (stage.users / (learnerJourney[0]?.users || 1)) * 100;
                   
                   return (
                     <div key={stage.stage} className="relative">
@@ -631,7 +631,7 @@ export function AnalyticsDashboard() {
                       {!isLast && (
                         <div className="flex justify-center mt-2">
                           <div className="text-xs text-gray-500">
-                            {((learnerJourney[index + 1].users / stage.users) * 100).toFixed(1)}% conversion
+                            {((learnerJourney[index + 1]?.users || 0) / stage.users * 100).toFixed(1)}% conversion
                           </div>
                         </div>
                       )}

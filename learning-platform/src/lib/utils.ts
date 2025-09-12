@@ -42,3 +42,20 @@ export function slugify(text: string): string {
     .replace(/[^\w ]+/g, '')
     .replace(/ +/g, '-')
 }
+
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+export function getRoleColor(role: string): string {
+  const colors: Record<string, string> = {
+    ADMIN: 'bg-red-100 text-red-800',
+    INSTRUCTOR: 'bg-blue-100 text-blue-800',
+    LEARNER: 'bg-green-100 text-green-800',
+  };
+  return colors[role] || 'bg-gray-100 text-gray-800';
+}

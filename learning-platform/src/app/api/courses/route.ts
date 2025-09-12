@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
       price: body.price || 0,
       currency: body.currency || 'USD',
       thumbnailUrl: body.thumbnailUrl,
-      isAIGenerated: body.isAIGenerated || false
+      isAIGenerated: body.isAIGenerated || false,
+      createdBy: userId
     }, userId)
     
     return NextResponse.json({
