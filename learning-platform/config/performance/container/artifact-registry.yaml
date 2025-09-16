@@ -1,0 +1,252 @@
+# Google Cloud Artifact Registry Configuration
+# Optimized for Learning Platform container deployment
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifact-registry-config
+  namespace: learning-platform
+data:
+  # Registry Configuration
+  registry_url: "us-central1-docker.pkg.dev"
+  project_id: "${PROJECT_ID}"
+  repository_name: "learning-platform"
+  region: "us-central1"
+  
+  # Image Configuration
+  base_image_name: "learning-platform"
+  image_tags: "latest,${BUILD_ID:-dev},${COMMIT_SHA:-local}"
+  
+  # Build Configuration
+  build_context: "."
+  dockerfile_path: "./config/performance/container/Dockerfile.optimized"
+  build_args: |
+    NODE_ENV=production
+    NEXT_TELEMETRY_DISABLED=1
+    BUILD_ID=${BUILD_ID}
+    COMMIT_SHA=${COMMIT_SHA}
+
+---
+# Cloud Build Configuration for Artifact Registry
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudbuild-config
+  namespace: learning-platform
+data:
+  cloudbuild.yaml: |
+    # Cloud Build configuration for optimized container builds
+    steps:
+      # Build the optimized container
+      - name: 'gcr.io/cloud-builders/docker'
+        args:
+          - 'build'
+          - '--file=config/performance/container/Dockerfile.optimized'
+          - '--tag=${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${BUILD_ID}'
+          - '--tag=${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:latest'
+          - '--build-arg=NODE_ENV=production'
+          - '--build-arg=BUILD_ID=${BUILD_ID}'
+          - '--build-arg=COMMIT_SHA=${COMMIT_SHA}'
+          - '--cache-from=${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:latest'
+          - '.'
+        id: 'build-image'
+
+      # Security scan
+      - name: 'gcr.io/cloud-builders/gcloud'
+        args:
+          - 'container'
+          - 'images'
+          - 'scan'
+          - '${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${BUILD_ID}'
+          - '--format=json'
+        id: 'scan-image'
+        waitFor: ['build-image']
+
+      # Push to Artifact Registry
+      - name: 'gcr.io/cloud-builders/docker'
+        args:
+          - 'push'
+          - '--all-tags'
+          - '${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}'
+        id: 'push-image'
+        waitFor: ['scan-image']
+
+      # Deploy to Cloud Run (optional)
+      - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+        entrypoint: 'gcloud'
+        args:
+          - 'run'
+          - 'deploy'
+          - '${_SERVICE_NAME}'
+          - '--image=${_REGISTRY_URL}/${PROJECT_ID}/${_REPOSITORY}/${_IMAGE}:${BUILD_ID}'
+          - '--platform=managed'
+          - '--region=${_REGION}'
+          - '--allow-unauthenticated'
+          - '--memory=2Gi'
+          - '--cpu=2'
+          - '--max-instances=100'
+          - '--concurrency=1000'
+          - '--port=3000'
+          - '--set-env-vars=NODE_ENV=production'
+          - '--set-env-vars=NEXT_TELEMETRY_DISABLED=1'
+        id: 'deploy-service'
+        waitFor: ['push-image']
+
+    # Build configuration
+    options:
+      machineType: 'E2_HIGHCPU_8'
+      diskSizeGb: 100
+      logging: 'CLOUD_LOGGING_ONLY'
+
+    # Substitutions for flexibility
+    substitutions:
+      _REGISTRY_URL: 'us-central1-docker.pkg.dev'
+      _REPOSITORY: 'learning-platform'
+      _IMAGE: 'app'
+      _SERVICE_NAME: 'learning-platform'
+      _REGION: 'us-central1'
+
+    # Build timeout
+    timeout: '1200s'
+
+---
+# Deployment Scripts ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: deployment-scripts
+  namespace: learning-platform
+data:
+  setup-artifact-registry.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Colors for output
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+    
+    # Configuration
+    PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project)}"
+    REGION="${REGION:-us-central1}"
+    REPOSITORY="${REPOSITORY:-learning-platform}"
+    
+    echo -e "${GREEN}Setting up Artifact Registry for Learning Platform${NC}"
+    echo "Project ID: $PROJECT_ID"
+    echo "Region: $REGION"
+    echo "Repository: $REPOSITORY"
+    
+    # Enable required APIs
+    echo -e "${YELLOW}Enabling required APIs...${NC}"
+    gcloud services enable artifactregistry.googleapis.com \
+                          cloudbuild.googleapis.com \
+                          run.googleapis.com
+    
+    # Create Artifact Registry repository
+    echo -e "${YELLOW}Creating Artifact Registry repository...${NC}"
+    gcloud artifacts repositories create $REPOSITORY \
+        --repository-format=docker \
+        --location=$REGION \
+        --description="Learning Platform container repository" \
+        --project=$PROJECT_ID || echo "Repository may already exist"
+    
+    # Configure Docker authentication
+    echo -e "${YELLOW}Configuring Docker authentication...${NC}"
+    gcloud auth configure-docker $REGION-docker.pkg.dev
+    
+    # Create Cloud Build trigger (optional)
+    echo -e "${YELLOW}Creating Cloud Build trigger...${NC}"
+    cat > trigger.yaml << EOF
+    name: learning-platform-build
+    description: Build and deploy Learning Platform
+    github:
+      owner: your-github-username
+      name: learning-platform
+      push:
+        branch: ^main$
+    filename: config/performance/container/cloudbuild.yaml
+    substitutions:
+      _REGISTRY_URL: $REGION-docker.pkg.dev
+      _REPOSITORY: $REPOSITORY
+      _IMAGE: app
+      _SERVICE_NAME: learning-platform
+      _REGION: $REGION
+    EOF
+    
+    gcloud builds triggers import --source=trigger.yaml || echo "Trigger creation skipped"
+    rm -f trigger.yaml
+    
+    echo -e "${GREEN}Artifact Registry setup completed!${NC}"
+    echo "Registry URL: $REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY"
+
+  build-and-push.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Configuration
+    PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project)}"
+    REGION="${REGION:-us-central1}"
+    REPOSITORY="${REPOSITORY:-learning-platform}"
+    IMAGE="${IMAGE:-app}"
+    TAG="${TAG:-$(git rev-parse --short HEAD)}"
+    
+    REGISTRY_URL="$REGION-docker.pkg.dev"
+    FULL_IMAGE_NAME="$REGISTRY_URL/$PROJECT_ID/$REPOSITORY/$IMAGE"
+    
+    echo "Building and pushing image: $FULL_IMAGE_NAME:$TAG"
+    
+    # Build the optimized image
+    echo "Building container..."
+    docker build \
+        -f config/performance/container/Dockerfile.optimized \
+        -t "$FULL_IMAGE_NAME:$TAG" \
+        -t "$FULL_IMAGE_NAME:latest" \
+        --build-arg NODE_ENV=production \
+        --build-arg BUILD_ID="$TAG" \
+        --build-arg COMMIT_SHA="$(git rev-parse HEAD)" \
+        .
+    
+    # Push to Artifact Registry
+    echo "Pushing to Artifact Registry..."
+    docker push "$FULL_IMAGE_NAME:$TAG"
+    docker push "$FULL_IMAGE_NAME:latest"
+    
+    echo "Image pushed successfully!"
+    echo "Image URL: $FULL_IMAGE_NAME:$TAG"
+
+  optimize-image.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    # Image optimization script using dive for analysis
+    
+    IMAGE_NAME="$1"
+    
+    if [ -z "$IMAGE_NAME" ]; then
+        echo "Usage: $0 <image-name>"
+        exit 1
+    fi
+    
+    echo "Analyzing image efficiency: $IMAGE_NAME"
+    
+    # Install dive if not present
+    if ! command -v dive &> /dev/null; then
+        echo "Installing dive for image analysis..."
+        curl -L https://github.com/wagoodman/dive/releases/download/v0.10.0/dive_0.10.0_linux_amd64.tar.gz | tar xz
+        sudo mv dive /usr/local/bin/
+    fi
+    
+    # Analyze image
+    echo "Running image analysis..."
+    dive "$IMAGE_NAME" --ci
+    
+    # Get image size info
+    echo "Image size information:"
+    docker images "$IMAGE_NAME" --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+    
+    # Security scan if available
+    if command -v trivy &> /dev/null; then
+        echo "Running security scan..."
+        trivy image "$IMAGE_NAME"
+    fi

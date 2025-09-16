@@ -205,7 +205,7 @@ export function CourseBuilder() {
             moduleId: `module-${index}`,
             type: content.type,
             title: content.title,
-            content: content.content,
+            content: content.content || '',
             order: content.order,
             createdAt: new Date(),
             updatedAt: new Date()
@@ -489,7 +489,7 @@ export function CourseBuilder() {
                 <div>
                   <label className="block text-sm font-medium mb-2">Level</label>
                   <Select 
-                    value={course.level} 
+                    value={course.level || ''} 
                     onValueChange={(value) => setCourse(prev => ({ ...prev, level: value as CourseLevel }))}
                   >
                     <SelectTrigger>

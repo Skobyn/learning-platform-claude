@@ -147,7 +147,7 @@ class FileUploadService {
       if (!validation.valid) {
         return {
           success: false,
-          error: validation.error,
+          error: validation.error || 'Invalid file',
         };
       }
 
@@ -156,11 +156,11 @@ class FileUploadService {
       const uniqueFilename = `${uuidv4()}${fileExtension}`;
       
       // Create directory structure
-      const uploadDir = path.join(this.baseUploadPath, uploadType, new Date().toISOString().split('T')[0]);
+      const uploadDir = path.join(this.baseUploadPath, uploadType, new Date().toISOString().split('T')[0] || 'unknown');
       await this.ensureDirectoryExists(uploadDir);
       
       const filePath = path.join(uploadDir, uniqueFilename);
-      const relativeUrl = path.join(uploadType, new Date().toISOString().split('T')[0], uniqueFilename).replace(/\\/g, '/');
+      const relativeUrl = path.join(uploadType, new Date().toISOString().split('T')[0] || 'unknown', uniqueFilename).replace(/\\/g, '/');
       
       // Save file to disk
       const buffer = Buffer.from(await file.arrayBuffer());

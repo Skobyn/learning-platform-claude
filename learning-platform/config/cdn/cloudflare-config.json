@@ -1,0 +1,241 @@
+{
+  "zone": {
+    "name": "learning-platform.example.com",
+    "settings": {
+      "ssl": "full",
+      "security_level": "medium",
+      "browser_integrity_check": "on",
+      "challenge_ttl": 1800,
+      "always_use_https": "on",
+      "minify": {
+        "css": "on",
+        "html": "on",
+        "js": "on"
+      },
+      "brotli": "on",
+      "early_hints": "on",
+      "http3": "on",
+      "zero_rtt": "on",
+      "tls_1_3": "on"
+    }
+  },
+  "page_rules": [
+    {
+      "targets": [
+        {
+          "target": "url",
+          "constraint": {
+            "operator": "matches",
+            "value": "learning-platform.example.com/static/*"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "id": "browser_cache_ttl",
+          "value": 31536000
+        },
+        {
+          "id": "edge_cache_ttl",
+          "value": 31536000
+        },
+        {
+          "id": "cache_level",
+          "value": "cache_everything"
+        }
+      ],
+      "priority": 1,
+      "status": "active"
+    },
+    {
+      "targets": [
+        {
+          "target": "url",
+          "constraint": {
+            "operator": "matches",
+            "value": "learning-platform.example.com/videos/*"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "id": "browser_cache_ttl",
+          "value": 86400
+        },
+        {
+          "id": "edge_cache_ttl",
+          "value": 604800
+        },
+        {
+          "id": "cache_level",
+          "value": "cache_everything"
+        },
+        {
+          "id": "polish",
+          "value": "off"
+        }
+      ],
+      "priority": 2,
+      "status": "active"
+    },
+    {
+      "targets": [
+        {
+          "target": "url",
+          "constraint": {
+            "operator": "matches",
+            "value": "learning-platform.example.com/api/*"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "id": "cache_level",
+          "value": "bypass"
+        },
+        {
+          "id": "security_level",
+          "value": "high"
+        }
+      ],
+      "priority": 3,
+      "status": "active"
+    }
+  ],
+  "cache_rules": [
+    {
+      "expression": "(http.request.uri.path matches \"^/static/.*\\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$\")",
+      "action": "cache",
+      "cache_key": {
+        "cache_by_device_type": false,
+        "include_protocol": false,
+        "custom_key": {
+          "query_string": {
+            "exclude": "*"
+          },
+          "header": {
+            "include": ["Accept-Encoding"]
+          }
+        }
+      },
+      "edge_ttl": {
+        "mode": "override_origin",
+        "value": 31536000
+      },
+      "browser_ttl": {
+        "mode": "override_origin",
+        "value": 31536000
+      }
+    },
+    {
+      "expression": "(http.request.uri.path matches \"^/videos/.*\\.(mp4|webm|m3u8|ts)$\")",
+      "action": "cache",
+      "cache_key": {
+        "cache_by_device_type": true,
+        "include_protocol": false,
+        "custom_key": {
+          "query_string": {
+            "include": ["quality", "format"]
+          },
+          "header": {
+            "include": ["Accept-Encoding", "Accept", "Range"]
+          }
+        }
+      },
+      "edge_ttl": {
+        "mode": "override_origin",
+        "value": 604800
+      },
+      "browser_ttl": {
+        "mode": "override_origin",
+        "value": 86400
+      }
+    },
+    {
+      "expression": "(http.request.uri.path matches \"^/api/content/.*\")",
+      "action": "cache",
+      "cache_key": {
+        "cache_by_device_type": false,
+        "include_protocol": false,
+        "custom_key": {
+          "query_string": {
+            "include": ["page", "limit", "filter"]
+          },
+          "header": {
+            "include": ["Accept-Language"]
+          }
+        }
+      },
+      "edge_ttl": {
+        "mode": "override_origin",
+        "value": 300
+      },
+      "browser_ttl": {
+        "mode": "override_origin",
+        "value": 60
+      }
+    }
+  ],
+  "origin_rules": [
+    {
+      "expression": "(http.request.uri.path matches \"^/videos/.*\")",
+      "action": {
+        "host_header": "video-origin.learning-platform.example.com"
+      }
+    }
+  ],
+  "transform_rules": [
+    {
+      "expression": "(http.request.uri.path eq \"/\")",
+      "action": {
+        "response": {
+          "headers": {
+            "X-Frame-Options": {
+              "operation": "set",
+              "value": "DENY"
+            },
+            "X-Content-Type-Options": {
+              "operation": "set",
+              "value": "nosniff"
+            },
+            "Strict-Transport-Security": {
+              "operation": "set",
+              "value": "max-age=31536000; includeSubDomains; preload"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "bandwidth_optimization": {
+    "polish": {
+      "enabled": true,
+      "webp": true,
+      "lossy": false
+    },
+    "mirage": true,
+    "rocket_loader": true,
+    "auto_minify": {
+      "css": true,
+      "html": true,
+      "js": true
+    },
+    "brotli": true
+  },
+  "video_optimization": {
+    "stream": {
+      "enabled": true,
+      "adaptive_bitrate": true,
+      "watermarks": false
+    }
+  },
+  "workers": [
+    {
+      "name": "cache-invalidation-worker",
+      "script": "addEventListener('fetch', event => { event.respondWith(handleRequest(event.request)); })",
+      "routes": [
+        "learning-platform.example.com/api/cache/invalidate/*"
+      ]
+    }
+  ]
+}

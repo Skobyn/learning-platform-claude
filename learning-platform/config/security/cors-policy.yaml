@@ -1,0 +1,112 @@
+# CORS Policy Configuration for Learning Platform
+# Secure Cross-Origin Resource Sharing settings
+
+cors:
+  # Allowed origins - restrict to known domains
+  allowed_origins:
+    production:
+      - "https://learning.rdspos.com"
+      - "https://app.rdspos.com"
+      - "https://admin.rdspos.com"
+    
+    development:
+      - "http://localhost:3000"
+      - "http://localhost:3001"
+      - "http://127.0.0.1:3000"
+    
+    staging:
+      - "https://staging-learning.rdspos.com"
+  
+  # Allowed HTTP methods
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "PATCH"
+    - "DELETE"
+    - "OPTIONS"
+  
+  # Allowed headers
+  allowed_headers:
+    - "Content-Type"
+    - "Authorization"
+    - "X-Requested-With"
+    - "X-CSRF-Token"
+    - "X-API-Key"
+    - "Accept"
+    - "Origin"
+    - "User-Agent"
+  
+  # Exposed headers (headers client can access)
+  exposed_headers:
+    - "X-RateLimit-Limit"
+    - "X-RateLimit-Remaining"
+    - "X-RateLimit-Reset"
+    - "X-Total-Count"
+    - "X-Request-ID"
+  
+  # Credentials support
+  allow_credentials: true
+  
+  # Preflight cache duration (in seconds)
+  max_age: 86400 # 24 hours
+  
+  # Security options
+  options_success_status: 204
+  
+  # Dynamic origin validation
+  dynamic_origin_validation:
+    enabled: true
+    validation_function: "validateOrigin"
+    fallback_policy: "deny"
+
+# Security Headers Configuration
+security_headers:
+  # Strict Transport Security
+  hsts:
+    enabled: true
+    max_age: 31536000 # 1 year
+    include_subdomains: true
+    preload: true
+  
+  # X-Frame-Options
+  frame_options:
+    policy: "DENY" # Prevent clickjacking
+  
+  # X-Content-Type-Options
+  content_type_options:
+    nosniff: true
+  
+  # Referrer Policy
+  referrer_policy: "strict-origin-when-cross-origin"
+  
+  # Permissions Policy
+  permissions_policy:
+    geolocation: "none"
+    camera: "none"
+    microphone: "none"
+    payment: "none"
+    usb: "none"
+    bluetooth: "none"
+  
+  # X-XSS-Protection (deprecated but still useful for older browsers)
+  xss_protection:
+    enabled: true
+    mode: "block"
+
+# Environment-specific configurations
+environments:
+  production:
+    strict_mode: true
+    log_violations: true
+    block_suspicious_requests: true
+  
+  development:
+    strict_mode: false
+    allow_localhost: true
+    detailed_error_responses: true
+  
+  testing:
+    allow_all_origins: false
+    mock_headers: true
+    bypass_rate_limiting: false

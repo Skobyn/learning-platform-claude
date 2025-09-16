@@ -1,0 +1,47 @@
+{
+  "displayName": "Learning Platform - Service Uptime Check",
+  "httpCheck": {
+    "path": "/api/health",
+    "port": 443,
+    "useSsl": true,
+    "validateSsl": true,
+    "headers": {
+      "User-Agent": "Google-Cloud-Uptime-Check"
+    },
+    "acceptedResponseStatusCodes": [
+      {
+        "statusClass": "STATUS_CLASS_2XX"
+      }
+    ],
+    "body": "",
+    "contentType": "URL_ENCODED",
+    "requestMethod": "GET"
+  },
+  "monitoredResource": {
+    "type": "uptime_url",
+    "labels": {
+      "project_id": "PROJECT_ID_PLACEHOLDER",
+      "host": "DOMAIN_PLACEHOLDER"
+    }
+  },
+  "checkIntervalSec": "60s",
+  "timeout": "10s",
+  "contentMatchers": [
+    {
+      "content": "\"status\": \"healthy\"",
+      "matcher": "CONTAINS_STRING"
+    }
+  ],
+  "selectedRegions": [
+    "USA",
+    "EUROPE",
+    "SOUTH_AMERICA",
+    "ASIA_PACIFIC"
+  ],
+  "isInternal": false,
+  "userLabels": {
+    "environment": "production",
+    "service": "learning-platform",
+    "component": "web-service"
+  }
+}

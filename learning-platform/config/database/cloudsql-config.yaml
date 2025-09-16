@@ -1,0 +1,305 @@
+# Google Cloud SQL Production Configuration
+# Enterprise-grade settings for 100K+ concurrent connections
+# Optimized for learning platform workloads
+
+# Database instance configuration
+instance:
+  name: learning-platform-prod
+  project: rds-lms
+  region: us-central1
+  zone: us-central1-a
+
+  # High availability configuration
+  availability_type: REGIONAL  # Multi-zone for 99.95% SLA
+  backup_enabled: true
+  backup_start_time: "03:00"  # UTC
+  backup_location: us-central1
+  point_in_time_recovery_enabled: true
+  transaction_log_retention_days: 7
+
+  # Instance specifications
+  tier: db-custom-16-65536  # 16 vCPU, 64GB RAM
+  storage_type: SSD
+  storage_size: 1000  # GB, auto-increase enabled
+  storage_auto_resize: true
+  storage_auto_resize_limit: 10000  # Max 10TB
+
+  # Network configuration
+  private_network: projects/rds-lms/global/networks/learning-platform-vpc
+  allocated_ip_range: google-managed-services-learning-platform-vpc
+  require_ssl: true
+  authorized_networks: []  # Use private IP only
+
+  # Maintenance configuration
+  maintenance_window:
+    day: SUNDAY
+    hour: 4  # UTC
+    update_track: stable
+
+  # Deletion protection
+  deletion_protection: true
+
+# Database flags for optimization
+database_flags:
+  # Connection settings
+  max_connections: "1000"  # Increased for high concurrency
+  shared_preload_libraries: "pg_stat_statements,pg_prewarm"
+
+  # Memory settings
+  shared_buffers: "16384MB"  # 25% of RAM
+  effective_cache_size: "49152MB"  # 75% of RAM
+  work_mem: "32MB"  # Per connection work memory
+  maintenance_work_mem: "2048MB"
+
+  # WAL and checkpoint settings
+  wal_buffers: "64MB"
+  checkpoint_completion_target: "0.7"
+  checkpoint_timeout: "10min"
+  max_wal_size: "4096MB"
+  min_wal_size: "1024MB"
+
+  # Query planner settings
+  random_page_cost: "1.1"  # SSD optimized
+  effective_io_concurrency: "200"  # SSD optimized
+  default_statistics_target: "500"  # Better query plans
+
+  # Logging settings
+  log_statement: "ddl"
+  log_min_duration_statement: "1000"  # Log slow queries > 1s
+  log_checkpoints: "on"
+  log_connections: "off"  # Reduce log volume
+  log_disconnections: "off"
+  log_lock_waits: "on"
+
+  # Performance monitoring
+  track_activities: "on"
+  track_counts: "on"
+  track_functions: "all"
+  track_io_timing: "on"
+
+  # Connection pooling optimization
+  tcp_keepalives_idle: "300"
+  tcp_keepalives_interval: "30"
+  tcp_keepalives_count: "3"
+
+  # Parallel query settings
+  max_parallel_workers: "16"
+  max_parallel_workers_per_gather: "4"
+  max_parallel_maintenance_workers: "4"
+
+  # Auto-vacuum settings
+  autovacuum: "on"
+  autovacuum_max_workers: "6"
+  autovacuum_naptime: "15s"
+  autovacuum_vacuum_threshold: "50"
+  autovacuum_analyze_threshold: "50"
+  autovacuum_vacuum_scale_factor: "0.1"
+  autovacuum_analyze_scale_factor: "0.05"
+  autovacuum_vacuum_cost_limit: "3000"
+
+  # Lock settings
+  deadlock_timeout: "1s"
+  lock_timeout: "60s"
+
+  # JSON optimization
+  gin_fuzzy_search_limit: "0"  # No limit for GIN index searches
+
+# Read replica configuration
+replicas:
+  - name: learning-platform-replica-1
+    region: us-east1  # Different region for disaster recovery
+    tier: db-custom-8-32768  # 8 vCPU, 32GB RAM
+    replica_type: READ_REPLICA
+
+  - name: learning-platform-replica-2
+    region: us-west1  # Another region for load distribution
+    tier: db-custom-8-32768
+    replica_type: READ_REPLICA
+
+  - name: learning-platform-replica-analytics
+    region: us-central1  # Same region for analytics workloads
+    tier: db-custom-16-65536  # Larger for heavy analytics
+    replica_type: READ_REPLICA
+
+# Database users and permissions
+users:
+  - name: app-user
+    password: "${APP_USER_PASSWORD}"
+    type: BUILT_IN
+    privileges:
+      - database: learning_platform
+        permissions:
+          - SELECT
+          - INSERT
+          - UPDATE
+          - DELETE
+        tables:
+          - User
+          - Course
+          - Lesson
+          - Enrollment
+          - Progress
+          - Quiz
+          - QuizAttempt
+          - Certificate
+          - Discussion
+          - Comment
+          - Notification
+          - UserBadge
+
+  - name: analytics-user
+    password: "${ANALYTICS_USER_PASSWORD}"
+    type: BUILT_IN
+    privileges:
+      - database: learning_platform
+        permissions:
+          - SELECT
+        tables:
+          - UserAnalytics
+          - CourseAnalytics
+          - SystemAnalytics
+          - AuditLog
+
+  - name: backup-user
+    password: "${BACKUP_USER_PASSWORD}"
+    type: BUILT_IN
+    privileges:
+      - database: learning_platform
+        permissions:
+          - SELECT
+
+# Monitoring and alerting
+monitoring:
+  # Cloud SQL Insights
+  query_insights_enabled: true
+  record_application_tags: true
+  record_client_address: true
+  query_sample_rate: 1.0
+  query_plans_per_minute: 20
+
+  # Metrics collection
+  enabled_metrics:
+    - database/postgresql/num_backends
+    - database/postgresql/transaction_count
+    - database/postgresql/lock_count
+    - database/postgresql/deadlock_count
+    - database/cpu/utilization
+    - database/memory/utilization
+    - database/disk/utilization
+    - database/network/sent_bytes_count
+    - database/network/received_bytes_count
+    - database/up
+
+  # Alert policies
+  alert_policies:
+    - name: "High CPU Utilization"
+      condition: "database/cpu/utilization > 0.8"
+      duration: "5m"
+      notification_channels:
+        - "${NOTIFICATION_EMAIL}"
+        - "${SLACK_WEBHOOK}"
+
+    - name: "High Memory Utilization"
+      condition: "database/memory/utilization > 0.9"
+      duration: "5m"
+
+    - name: "High Connection Count"
+      condition: "database/postgresql/num_backends > 800"
+      duration: "2m"
+
+    - name: "Replication Lag"
+      condition: "database/replication/replica_lag > 30"
+      duration: "5m"
+
+    - name: "Storage Utilization"
+      condition: "database/disk/utilization > 0.8"
+      duration: "10m"
+
+# Security configuration
+security:
+  # SSL/TLS
+  require_ssl: true
+  ssl_mode: REQUIRE
+
+  # IP whitelist (empty for private IP only)
+  authorized_networks: []
+
+  # Database authentication
+  password_validation:
+    enable_password_policy: true
+    min_length: 12
+    complexity: COMPLEXITY_DEFAULT
+    reuse_interval: 10
+
+  # Audit logging
+  audit_config:
+    log_type: DATA_ACCESS
+    exempted_members: []
+
+  # Encryption
+  disk_encryption_configuration:
+    kms_key_name: "projects/rds-lms/locations/us-central1/keyRings/database-keys/cryptoKeys/database-key"
+
+# Automatic scaling configuration
+auto_scaling:
+  # CPU-based scaling
+  cpu_target: 70  # Scale when CPU > 70%
+  min_replicas: 2
+  max_replicas: 5
+  scale_in_cooldown: "300s"
+  scale_out_cooldown: "120s"
+
+  # Storage auto-resize
+  storage_auto_resize: true
+  storage_auto_resize_limit: 10000  # 10TB max
+
+# Backup configuration
+backup_policy:
+  # Automated backups
+  enabled: true
+  start_time: "03:00"  # UTC
+  location: us-central1
+  point_in_time_recovery_enabled: true
+  transaction_log_retention_days: 7
+
+  # Backup retention
+  retained_backups: 30  # Keep 30 automated backups
+  retention_unit: COUNT
+
+  # Export configuration for long-term storage
+  export_configuration:
+    destination: "gs://learning-platform-backups"
+    format: SQL
+    compression: GZIP
+
+# Performance tuning presets
+performance_presets:
+  oltp_high_concurrency:
+    description: "Optimized for high transaction throughput"
+    flags:
+      shared_buffers: "16384MB"
+      effective_cache_size: "49152MB"
+      work_mem: "32MB"
+      maintenance_work_mem: "2048MB"
+      max_connections: "1000"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+
+  analytics_workload:
+    description: "Optimized for analytical queries"
+    flags:
+      work_mem: "256MB"
+      max_parallel_workers_per_gather: "8"
+      maintenance_work_mem: "4096MB"
+      random_page_cost: "1.0"
+      seq_page_cost: "1.0"
+
+  mixed_workload:
+    description: "Balanced for OLTP and analytics"
+    flags:
+      shared_buffers: "16384MB"
+      effective_cache_size: "49152MB"
+      work_mem: "64MB"
+      maintenance_work_mem: "2048MB"
+      max_connections: "800"
+      max_parallel_workers_per_gather: "4"

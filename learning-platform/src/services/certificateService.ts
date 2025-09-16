@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs/promises';
+import { createWriteStream } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
@@ -148,7 +149,7 @@ class CertificateService {
       );
 
       if (!validation.eligible) {
-        return { success: false, error: validation.reason };
+        return { success: false, error: validation.reason || 'Not eligible for certificate' };
       }
 
       // Check if certificate already exists
@@ -183,7 +184,7 @@ class CertificateService {
       );
 
       if (!pdfResult.success) {
-        return { success: false, error: pdfResult.error };
+        return { success: false, error: pdfResult.error || 'Failed to generate PDF' };
       }
 
       // Store certificate record
@@ -219,7 +220,7 @@ class CertificateService {
       return {
         success: true,
         certificateId: certificate.id,
-        pdfUrl: pdfResult.pdfUrl,
+        pdfUrl: pdfResult.pdfUrl || '',
         verificationCode,
       };
 
@@ -251,7 +252,7 @@ class CertificateService {
           course: {
             select: {
               title: true,
-              duration: true,
+              estimatedDuration: true,
             }
           }
         }
@@ -283,7 +284,7 @@ class CertificateService {
         metadata: {
           recipientName: `${certificate.user.firstName} ${certificate.user.lastName}`,
           courseTitle: certificate.course.title,
-          courseDuration: certificate.course.duration,
+          courseDuration: certificate.course.estimatedDuration,
           ...(certificate.metadata as Record<string, any>),
         },
         isValid: true,
@@ -494,7 +495,7 @@ class CertificateService {
       const doc = new PDFDocument({ size: 'A4', layout: 'landscape' });
       
       // Pipe to file
-      const stream = fs.createWriteStream(filePath);
+      const stream = createWriteStream(filePath);
       doc.pipe(stream);
 
       // Add background if specified
@@ -634,7 +635,7 @@ class CertificateService {
 
       // Wait for PDF to be written
       await new Promise((resolve, reject) => {
-        stream.on('finish', resolve);
+        stream.on('finish', () => resolve(undefined));
         stream.on('error', reject);
       });
 

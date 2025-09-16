@@ -21,9 +21,11 @@ export class AnalyticsService {
         data: {
           userId,
           eventType,
-          entityType,
-          entityId,
-          properties: properties || {},
+          data: {
+            entityType,
+            entityId,
+            properties: properties || {}
+          },
           timestamp: new Date()
         }
       });
@@ -113,17 +115,17 @@ export class AnalyticsService {
         prisma.enrollment.count({
           where: { 
             userId, 
-            status: 'completed',
+            status: 'COMPLETED',
             completedAt: { gte: startDate }
           }
         }),
         prisma.quizAttempt.findMany({
           where: {
             userId,
-            completedAt: { gte: startDate }
+            submittedAt: { gte: startDate }
           }
         }),
-        prisma.userBadge.count({
+        prisma.achievement.count({
           where: { userId, earnedAt: { gte: startDate } }
         }),
         prisma.certificate.count({
@@ -133,12 +135,12 @@ export class AnalyticsService {
 
       // Calculate total time spent
       const totalTimeSpent = timeSpentEvents.reduce((sum, event) => {
-        return sum + (event.properties?.timeSpent || 0);
+        return sum + ((event.data as any)?.properties?.timeSpent || 0);
       }, 0);
 
       // Calculate average quiz score
       const averageQuizScore = quizAttempts.length > 0 
-        ? quizAttempts.reduce((sum, attempt) => sum + attempt.score, 0) / quizAttempts.length
+        ? quizAttempts.reduce((sum, attempt) => sum + (attempt.score || 0), 0) / quizAttempts.length
         : 0;
 
       // Get activity trend
@@ -196,10 +198,10 @@ export class AnalyticsService {
           where: { courseId, enrolledAt: { gte: startDate } }
         }),
         prisma.enrollment.count({
-          where: { courseId, status: 'active' }
+          where: { courseId, status: 'ACTIVE' }
         }),
         prisma.enrollment.count({
-          where: { courseId, status: 'completed' }
+          where: { courseId, status: 'COMPLETED' }
         }),
         prisma.enrollment.findMany({
           where: { courseId }
@@ -276,11 +278,11 @@ export class AnalyticsService {
             } 
           } 
         }),
-        prisma.course.count({ where: { isPublished: true } }),
+        prisma.course.count({ where: { status: 'PUBLISHED' } }),
         prisma.enrollment.count({ where: { enrolledAt: { gte: startDate } } }),
         prisma.enrollment.count({
           where: {
-            status: 'completed',
+            status: 'COMPLETED',
             completedAt: { gte: startDate }
           }
         }),
@@ -384,15 +386,14 @@ export class AnalyticsService {
       }
 
       if (reportConfig.filters.courseIds) {
-        where.entityId = { in: reportConfig.filters.courseIds };
-        where.entityType = 'course';
+        where.data = {
+          path: ['entityType'],
+          equals: 'course'
+        };
       }
 
       const events = await prisma.analyticsEvent.findMany({
-        where,
-        include: {
-          user: true
-        }
+        where
       });
 
       // Process events based on requested metrics
@@ -437,11 +438,6 @@ export class AnalyticsService {
 
       const events = await prisma.analyticsEvent.findMany({
         where,
-        include: {
-          user: {
-            select: { email: true, firstName: true, lastName: true }
-          }
-        },
         orderBy: { timestamp: 'desc' }
       });
 
@@ -504,7 +500,9 @@ export class AnalyticsService {
     const trend: Record<string, number> = {};
     events.forEach(event => {
       const date = event.timestamp.toISOString().split('T')[0];
-      trend[date] = (trend[date] || 0) + event._count;
+      if (date) {
+        trend[date] = (trend[date] || 0) + 1;
+      }
     });
 
     return Object.entries(trend).map(([date, events]) => ({ date, events }));
@@ -533,7 +531,9 @@ export class AnalyticsService {
     const trend: Record<string, number> = {};
     enrollments.forEach(enrollment => {
       const date = enrollment.enrolledAt.toISOString().split('T')[0];
-      trend[date] = (trend[date] || 0) + enrollment._count;
+      if (date) {
+        trend[date] = (trend[date] || 0) + 1;
+      }
     });
 
     return Object.entries(trend).map(([date, enrollments]) => ({ date, enrollments }));
@@ -561,7 +561,7 @@ export class AnalyticsService {
     });
 
     const averageTimePerModule = moduleCompletions.length > 0
-      ? moduleCompletions.reduce((sum, event) => sum + (event.properties?.timeSpent || 0), 0) / moduleCompletions.length
+      ? moduleCompletions.reduce((sum, event) => sum + ((event.data as any)?.properties?.timeSpent || 0), 0) / moduleCompletions.length
       : 0;
 
     // Get video watch events
@@ -611,7 +611,7 @@ export class AnalyticsService {
         });
         
         return {
-          course: course as Course,
+          course: course as any,
           enrollments: item._count,
           rating: 4.5 // Would be calculated from actual ratings
         };
@@ -635,10 +635,14 @@ export class AnalyticsService {
     const trend: Record<string, Set<string>> = {};
     dailyActiveUsers.forEach(item => {
       const date = item.timestamp.toISOString().split('T')[0];
-      if (!trend[date]) {
-        trend[date] = new Set();
+      if (date) {
+        if (!trend[date]) {
+          trend[date] = new Set();
+        }
+        if (item.userId) {
+          trend[date].add(item.userId);
+        }
       }
-      trend[date].add(item.userId);
     });
 
     return Object.entries(trend).map(([date, userSet]) => ({

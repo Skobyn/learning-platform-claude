@@ -1,0 +1,34 @@
+FROM nginx:alpine
+
+# Install additional packages
+RUN apk add --no-cache \
+    curl \
+    openssl \
+    && rm -rf /var/cache/apk/*
+
+# Copy configuration files
+COPY streaming.conf /etc/nginx/nginx.conf
+
+# Create cache directories
+RUN mkdir -p /var/cache/nginx/streaming && \
+    chown -R nginx:nginx /var/cache/nginx
+
+# Create SSL directory
+RUN mkdir -p /etc/nginx/ssl
+
+# Generate self-signed certificate for development
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/key.pem \
+    -out /etc/nginx/ssl/cert.pem \
+    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+
+# Health check script
+RUN echo '#!/bin/sh\ncurl -f http://localhost/health || exit 1' > /usr/local/bin/healthcheck.sh && \
+    chmod +x /usr/local/bin/healthcheck.sh
+
+EXPOSE 80 443
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /usr/local/bin/healthcheck.sh
+
+CMD ["nginx", "-g", "daemon off;"]

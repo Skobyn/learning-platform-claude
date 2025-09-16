@@ -3,8 +3,8 @@
 import React from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { LearningPath as LearningPathType, Course, Enrollment, CourseLevel } from '@/types'
 import { 
   MapPin, 
@@ -62,7 +62,7 @@ export function LearningPath({
   enrollments = [],
   className = '' 
 }: LearningPathProps) {
-  const coursesProgress: CourseProgress[] = React.useMemo(() => {
+  const coursesProgress = React.useMemo((): CourseProgress[] => {
     return learningPath.courses.map((course, index) => {
       const enrollment = enrollments.find(e => e.courseId === course.id)
       const isCompleted = enrollment?.status === 'completed'
@@ -84,12 +84,12 @@ export function LearningPath({
 
       return {
         course,
-        enrollment,
+        enrollment: enrollment || undefined,
         isCompleted,
         isAvailable,
         isNext,
         position: index + 1
-      }
+      } as CourseProgress
     })
   }, [learningPath.courses, enrollments])
 
@@ -172,7 +172,6 @@ export function LearningPath({
             </div>
             <Progress 
               value={pathStats.overallProgress} 
-              variant={pathStats.overallProgress >= 80 ? 'success' : 'default'}
               className="h-3"
             />
           </div>
@@ -343,7 +342,6 @@ export function LearningPath({
                             <div className="mt-3">
                               <Progress 
                                 value={enrollment.progress} 
-                                variant={enrollment.progress >= 80 ? 'success' : 'default'}
                                 className="h-2"
                               />
                             </div>
@@ -371,7 +369,7 @@ export function LearningPath({
               Congratulations! You've successfully completed the {learningPath.name} learning path.
             </p>
             <div className="flex items-center justify-center gap-4">
-              <Badge variant="gold" className="px-4 py-2">
+              <Badge variant="warning" className="px-4 py-2">
                 Certificate Available
               </Badge>
               <Badge variant="outline" className="px-4 py-2 cursor-pointer hover:bg-yellow-100">

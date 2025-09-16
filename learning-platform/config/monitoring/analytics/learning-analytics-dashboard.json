@@ -1,0 +1,218 @@
+{
+  "dashboard_name": "Learning Platform Analytics Dashboard",
+  "description": "Comprehensive analytics dashboard for learning platform insights",
+  "refresh_interval": "5m",
+  "time_range": {
+    "default": "30d",
+    "options": ["1d", "7d", "30d", "90d", "1y"]
+  },
+  "sections": [
+    {
+      "section_name": "Overview Metrics",
+      "widgets": [
+        {
+          "type": "scorecard",
+          "title": "Total Active Users",
+          "query": "COUNT(DISTINCT user_id) WHERE last_activity > NOW() - INTERVAL 30 DAY",
+          "format": "number",
+          "color_scheme": "blue"
+        },
+        {
+          "type": "scorecard", 
+          "title": "Course Completions",
+          "query": "COUNT(*) FROM course_completions WHERE completion_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+          "format": "number",
+          "color_scheme": "green"
+        },
+        {
+          "type": "scorecard",
+          "title": "Average Completion Rate",
+          "query": "AVG(completion_percentage) FROM user_course_progress WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+          "format": "percentage",
+          "color_scheme": "orange"
+        },
+        {
+          "type": "scorecard",
+          "title": "Revenue (30 days)",
+          "query": "SUM(amount) FROM transactions WHERE transaction_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+          "format": "currency",
+          "color_scheme": "purple"
+        }
+      ]
+    },
+    {
+      "section_name": "User Engagement",
+      "widgets": [
+        {
+          "type": "line_chart",
+          "title": "Daily Active Users",
+          "query": "SELECT DATE(last_activity) as date, COUNT(DISTINCT user_id) as active_users FROM user_activities GROUP BY DATE(last_activity) ORDER BY date",
+          "x_axis": "date",
+          "y_axis": "active_users",
+          "time_series": true
+        },
+        {
+          "type": "bar_chart",
+          "title": "Top 10 Popular Courses",
+          "query": "SELECT course_title, COUNT(*) as enrollments FROM enrollments e JOIN courses c ON e.course_id = c.id GROUP BY course_title ORDER BY enrollments DESC LIMIT 10",
+          "x_axis": "course_title",
+          "y_axis": "enrollments"
+        },
+        {
+          "type": "pie_chart",
+          "title": "User Role Distribution",
+          "query": "SELECT user_role, COUNT(*) as count FROM users GROUP BY user_role",
+          "label_field": "user_role",
+          "value_field": "count"
+        },
+        {
+          "type": "heatmap",
+          "title": "Learning Activity Heatmap",
+          "query": "SELECT HOUR(created_at) as hour, DAYOFWEEK(created_at) as day, COUNT(*) as activity_count FROM user_activities GROUP BY hour, day",
+          "x_axis": "hour",
+          "y_axis": "day",
+          "value_field": "activity_count"
+        }
+      ]
+    },
+    {
+      "section_name": "Learning Progress",
+      "widgets": [
+        {
+          "type": "funnel_chart",
+          "title": "Learning Funnel",
+          "stages": [
+            {
+              "stage": "Course Views",
+              "query": "SELECT COUNT(DISTINCT user_id) FROM course_views WHERE view_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            },
+            {
+              "stage": "Course Enrollments", 
+              "query": "SELECT COUNT(DISTINCT user_id) FROM enrollments WHERE enrollment_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            },
+            {
+              "stage": "First Lesson Started",
+              "query": "SELECT COUNT(DISTINCT user_id) FROM lesson_progress WHERE started_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            },
+            {
+              "stage": "50% Progress",
+              "query": "SELECT COUNT(DISTINCT user_id) FROM user_course_progress WHERE completion_percentage >= 50 AND updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            },
+            {
+              "stage": "Course Completed",
+              "query": "SELECT COUNT(DISTINCT user_id) FROM course_completions WHERE completion_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            }
+          ]
+        },
+        {
+          "type": "line_chart",
+          "title": "Completion Rates by Course Category",
+          "query": "SELECT c.category, DATE(cc.completion_date) as date, COUNT(*) as completions FROM course_completions cc JOIN courses c ON cc.course_id = c.id GROUP BY c.category, DATE(cc.completion_date) ORDER BY date",
+          "x_axis": "date",
+          "y_axis": "completions",
+          "group_by": "category",
+          "time_series": true
+        },
+        {
+          "type": "histogram",
+          "title": "Time to Course Completion Distribution",
+          "query": "SELECT DATEDIFF(completion_date, enrollment_date) as days_to_complete, COUNT(*) as frequency FROM course_completions cc JOIN enrollments e ON cc.user_id = e.user_id AND cc.course_id = e.course_id WHERE cc.completion_date >= DATE_SUB(NOW(), INTERVAL 90 DAY) GROUP BY days_to_complete",
+          "x_axis": "days_to_complete",
+          "y_axis": "frequency",
+          "bins": 20
+        }
+      ]
+    },
+    {
+      "section_name": "Performance Metrics",
+      "widgets": [
+        {
+          "type": "gauge_chart",
+          "title": "Average Quiz Score",
+          "query": "SELECT AVG(score) as avg_score FROM quiz_attempts WHERE attempt_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+          "value_field": "avg_score",
+          "min_value": 0,
+          "max_value": 100,
+          "thresholds": [
+            {"value": 60, "color": "red"},
+            {"value": 80, "color": "yellow"}, 
+            {"value": 90, "color": "green"}
+          ]
+        },
+        {
+          "type": "table",
+          "title": "Course Performance Summary",
+          "query": "SELECT c.title as course_title, COUNT(DISTINCT e.user_id) as total_enrollments, COUNT(DISTINCT cc.user_id) as completions, ROUND((COUNT(DISTINCT cc.user_id) / COUNT(DISTINCT e.user_id)) * 100, 2) as completion_rate, AVG(qa.score) as avg_quiz_score FROM courses c LEFT JOIN enrollments e ON c.id = e.course_id LEFT JOIN course_completions cc ON c.id = cc.course_id LEFT JOIN quiz_attempts qa ON c.id = qa.course_id GROUP BY c.id, c.title ORDER BY completion_rate DESC",
+          "columns": [
+            {"field": "course_title", "title": "Course Title"},
+            {"field": "total_enrollments", "title": "Enrollments", "format": "number"},
+            {"field": "completions", "title": "Completions", "format": "number"},
+            {"field": "completion_rate", "title": "Completion Rate", "format": "percentage"},
+            {"field": "avg_quiz_score", "title": "Avg Quiz Score", "format": "number"}
+          ]
+        }
+      ]
+    },
+    {
+      "section_name": "Revenue Analytics",
+      "widgets": [
+        {
+          "type": "area_chart",
+          "title": "Revenue Trend",
+          "query": "SELECT DATE(transaction_date) as date, SUM(amount) as daily_revenue FROM transactions WHERE transaction_date >= DATE_SUB(NOW(), INTERVAL 90 DAY) GROUP BY DATE(transaction_date) ORDER BY date",
+          "x_axis": "date",
+          "y_axis": "daily_revenue",
+          "time_series": true,
+          "format": "currency"
+        },
+        {
+          "type": "donut_chart",
+          "title": "Revenue by Payment Method",
+          "query": "SELECT payment_method, SUM(amount) as total_revenue FROM transactions WHERE transaction_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) GROUP BY payment_method",
+          "label_field": "payment_method",
+          "value_field": "total_revenue",
+          "format": "currency"
+        },
+        {
+          "type": "stacked_bar_chart",
+          "title": "Monthly Revenue Breakdown",
+          "query": "SELECT DATE_FORMAT(transaction_date, '%Y-%m') as month, transaction_type, SUM(amount) as revenue FROM transactions WHERE transaction_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH) GROUP BY month, transaction_type ORDER BY month",
+          "x_axis": "month",
+          "y_axis": "revenue",
+          "stack_by": "transaction_type",
+          "format": "currency"
+        }
+      ]
+    }
+  ],
+  "filters": [
+    {
+      "name": "Date Range",
+      "type": "date_range",
+      "default_value": "30d",
+      "applies_to": "all_widgets"
+    },
+    {
+      "name": "User Role",
+      "type": "multi_select",
+      "options": ["student", "instructor", "admin"],
+      "applies_to": ["user_engagement", "learning_progress"]
+    },
+    {
+      "name": "Course Category",
+      "type": "multi_select",
+      "options": ["Technology", "Business", "Arts", "Science", "Language"],
+      "applies_to": ["learning_progress", "performance_metrics"]
+    }
+  ],
+  "export_options": {
+    "pdf": true,
+    "csv": true,
+    "scheduled_reports": true,
+    "email_reports": {
+      "daily": true,
+      "weekly": true,
+      "monthly": true
+    }
+  }
+}

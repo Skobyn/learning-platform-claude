@@ -145,7 +145,7 @@ export function UserManagement() {
   }, [users, filters]);
 
   const departments = useMemo(() => {
-    return [...new Set(users.map(u => u.department).filter(Boolean))];
+    return Array.from(new Set(users.map(u => u.department).filter(Boolean)));
   }, [users]);
 
   const bulkActions: BulkAction[] = [
@@ -525,7 +525,7 @@ export function UserManagement() {
               <SelectContent>
                 <SelectItem value="">All Departments</SelectItem>
                 {departments.map(dept => (
-                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  <SelectItem key={dept} value={dept || ''}>{dept}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -704,7 +704,7 @@ export function UserManagement() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Role</label>
-                    <Select defaultValue={userDialog.user?.role}>
+                    <Select defaultValue={userDialog.user?.role || ''}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>

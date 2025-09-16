@@ -11,7 +11,7 @@ export class NotificationService {
 
   constructor() {
     // Initialize email transporter
-    this.emailTransporter = nodemailer.createTransporter({
+    this.emailTransporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'localhost',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
@@ -40,7 +40,7 @@ export class NotificationService {
       const notification = await prisma.notification.create({
         data: {
           userId,
-          type,
+          type: type as any,
           title,
           message,
           data: data || {},

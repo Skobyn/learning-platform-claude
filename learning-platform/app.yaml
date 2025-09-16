@@ -1,0 +1,11 @@
+# Minimal Cloud Run configuration
+service: learning-platform
+runtime: nodejs18
+
+env_variables:
+  NODE_ENV: production
+  PORT: 8080
+
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10

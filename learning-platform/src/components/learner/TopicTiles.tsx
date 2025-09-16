@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/badge'
 import { BookOpen, Code, Database, Globe, Palette, Users, Zap, Brain } from 'lucide-react'
 
 interface TopicTile {

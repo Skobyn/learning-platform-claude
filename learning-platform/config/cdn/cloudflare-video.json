@@ -1,0 +1,535 @@
+{
+  "name": "Learning Platform Video CDN Configuration",
+  "description": "Cloudflare configuration for enterprise video streaming",
+  "version": "1.0.0",
+  "provider": "cloudflare",
+  "settings": {
+    "zones": [
+      {
+        "name": "video-cdn",
+        "domain": "${VIDEO_CDN_DOMAIN}",
+        "zoneId": "${CLOUDFLARE_ZONE_ID}",
+        "ssl": {
+          "mode": "strict",
+          "universalSsl": true,
+          "alwaysUseHttps": true,
+          "minTlsVersion": "1.2",
+          "ciphers": [
+            "ECDHE-ECDSA-AES128-GCM-SHA256",
+            "ECDHE-RSA-AES128-GCM-SHA256",
+            "ECDHE-ECDSA-AES256-GCM-SHA384",
+            "ECDHE-RSA-AES256-GCM-SHA384"
+          ]
+        },
+        "security": {
+          "securityLevel": "high",
+          "botFightMode": true,
+          "ddosProtection": true,
+          "waf": {
+            "enabled": true,
+            "rulesets": [
+              "cloudflare_managed",
+              "owasp_core_ruleset"
+            ]
+          }
+        },
+        "performance": {
+          "caching": {
+            "browserCache": 31536000,
+            "edgeCache": 2592000,
+            "developmentMode": false
+          },
+          "optimization": {
+            "minify": {
+              "css": true,
+              "js": true,
+              "html": true
+            },
+            "brotli": true,
+            "rocketLoader": false,
+            "imageResizing": true,
+            "mirage": false,
+            "polish": "lossless"
+          },
+          "http3": true,
+          "http2": true,
+          "earlyHints": true,
+          "tieredCache": true
+        }
+      }
+    ],
+    "pageRules": [
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*/api/video/stream/*"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 2592000
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 31536000
+          },
+          {
+            "id": "bypass_cache_on_cookie",
+            "value": "wp-*|wordpress*|comment_*|woocommerce_*"
+          }
+        ],
+        "priority": 1,
+        "status": "active"
+      },
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*.m3u8"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 300
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 300
+          }
+        ],
+        "priority": 2,
+        "status": "active"
+      },
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*.mpd"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 300
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 300
+          }
+        ],
+        "priority": 3,
+        "status": "active"
+      },
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*.ts"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 31536000
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 31536000
+          }
+        ],
+        "priority": 4,
+        "status": "active"
+      },
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*.m4s"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 31536000
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 31536000
+          }
+        ],
+        "priority": 5,
+        "status": "active"
+      }
+    ],
+    "workers": [
+      {
+        "name": "video-auth-worker",
+        "script": "addEventListener('fetch', event => {\n  event.respondWith(handleRequest(event.request));\n});\n\nasync function handleRequest(request) {\n  const url = new URL(request.url);\n  \n  // Check for video streaming endpoints\n  if (url.pathname.startsWith('/api/video/stream/')) {\n    const token = request.headers.get('Authorization') || url.searchParams.get('token');\n    \n    if (!token) {\n      return new Response('Authentication required', { status: 401 });\n    }\n    \n    // Validate token with origin server\n    const validationResponse = await fetch(`${ORIGIN_SERVER}/api/auth/validate-token`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': token\n      }\n    });\n    \n    if (!validationResponse.ok) {\n      return new Response('Invalid token', { status: 403 });\n    }\n    \n    // Add authenticated headers and forward request\n    const newHeaders = new Headers(request.headers);\n    newHeaders.set('X-Authenticated', 'true');\n    \n    const newRequest = new Request(request, { headers: newHeaders });\n    return fetch(newRequest);\n  }\n  \n  return fetch(request);\n}",
+        "routes": [
+          {
+            "pattern": "*/api/video/stream/*",
+            "zone": "${CLOUDFLARE_ZONE_ID}"
+          }
+        ]
+      }
+    ],
+    "customHostnames": [
+      {
+        "hostname": "videos.${DOMAIN}",
+        "ssl": {
+          "method": "http",
+          "type": "dv",
+          "validation_method": "http"
+        }
+      },
+      {
+        "hostname": "stream.${DOMAIN}",
+        "ssl": {
+          "method": "http",
+          "type": "dv",
+          "validation_method": "http"
+        }
+      }
+    ],
+    "loadBalancing": {
+      "pools": [
+        {
+          "name": "video-origin-pool",
+          "origins": [
+            {
+              "name": "primary-origin",
+              "address": "${ORIGIN_SERVER_IP}",
+              "enabled": true,
+              "weight": 1
+            },
+            {
+              "name": "fallback-origin",
+              "address": "${FALLBACK_SERVER_IP}",
+              "enabled": true,
+              "weight": 0.5
+            }
+          ],
+          "monitor": {
+            "type": "https",
+            "description": "Video origin health check",
+            "path": "/api/health",
+            "interval": 60,
+            "retries": 2,
+            "timeout": 5,
+            "expectedCodes": "200"
+          },
+          "healthChecks": {
+            "enabled": true,
+            "failureCount": 3,
+            "successCount": 2
+          }
+        }
+      ],
+      "loadBalancers": [
+        {
+          "name": "video-lb",
+          "fallbackPool": "video-origin-pool",
+          "defaultPools": ["video-origin-pool"],
+          "description": "Video streaming load balancer",
+          "ttl": 30,
+          "steeringPolicy": "dynamic_latency",
+          "sessionAffinity": "cookie",
+          "sessionAffinityTtl": 1800,
+          "proxied": true
+        }
+      ]
+    },
+    "rateLimiting": [
+      {
+        "threshold": 1000,
+        "period": 3600,
+        "action": "challenge",
+        "match": {
+          "request": {
+            "methods": ["GET", "POST"],
+            "schemes": ["HTTP", "HTTPS"],
+            "url": "*/api/video/stream/*"
+          }
+        },
+        "disabled": false,
+        "description": "Video streaming rate limit"
+      },
+      {
+        "threshold": 50,
+        "period": 3600,
+        "action": "block",
+        "match": {
+          "request": {
+            "methods": ["POST"],
+            "schemes": ["HTTPS"],
+            "url": "*/api/video/upload*"
+          }
+        },
+        "disabled": false,
+        "description": "Video upload rate limit"
+      }
+    ],
+    "spectrumApps": [
+      {
+        "protocol": "tcp/22",
+        "dns": {
+          "type": "CNAME",
+          "name": "ssh.${DOMAIN}"
+        },
+        "originDirect": ["${ORIGIN_SERVER_IP}:22"],
+        "proxyProtocol": "off"
+      }
+    ]
+  },
+  "streamingOptimizations": {
+    "argo": {
+      "enabled": true,
+      "smartRouting": true,
+      "tieredCaching": true
+    },
+    "railgun": {
+      "enabled": false
+    },
+    "polish": {
+      "enabled": true,
+      "webp": true,
+      "avif": true
+    },
+    "imageResizing": {
+      "enabled": true,
+      "fit": "scale-down",
+      "metadata": "keep",
+      "background": "#ffffff",
+      "quality": 85
+    }
+  },
+  "analytics": {
+    "webAnalytics": {
+      "enabled": true,
+      "siteTag": "${GA_MEASUREMENT_ID}"
+    },
+    "logpush": {
+      "enabled": true,
+      "destination": "s3://${S3_BUCKET}/cloudflare-logs/",
+      "fields": [
+        "ClientIP",
+        "ClientRequestHost",
+        "ClientRequestMethod",
+        "ClientRequestURI",
+        "EdgeResponseStatus",
+        "EdgeResponseBytes",
+        "RayID",
+        "EdgeStartTimestamp",
+        "EdgeEndTimestamp",
+        "CacheResponseStatus",
+        "CacheCacheStatus"
+      ],
+      "filter": "ClientRequestURI contains '/api/video/'"
+    }
+  },
+  "cloudflareStream": {
+    "enabled": true,
+    "accountId": "${CLOUDFLARE_ACCOUNT_ID}",
+    "apiToken": "${CLOUDFLARE_API_TOKEN}",
+    "settings": {
+      "uploadTimeout": 3600,
+      "allowedOrigins": [
+        "https://${DOMAIN}",
+        "https://www.${DOMAIN}",
+        "https://app.${DOMAIN}"
+      ],
+      "requireSignedUrls": true,
+      "thumbnails": {
+        "time": 30,
+        "height": 360,
+        "width": 640
+      },
+      "meta": {
+        "name": "Learning Platform Videos"
+      },
+      "watermark": {
+        "uid": "${WATERMARK_UID}",
+        "size": 0.05,
+        "position": "upperRight",
+        "opacity": 0.75
+      }
+    }
+  },
+  "dnsRecords": [
+    {
+      "type": "CNAME",
+      "name": "videos",
+      "content": "${ORIGIN_DOMAIN}",
+      "ttl": 1,
+      "proxied": true
+    },
+    {
+      "type": "CNAME",
+      "name": "stream",
+      "content": "${ORIGIN_DOMAIN}",
+      "ttl": 1,
+      "proxied": true
+    },
+    {
+      "type": "CNAME",
+      "name": "cdn",
+      "content": "${ORIGIN_DOMAIN}",
+      "ttl": 1,
+      "proxied": true
+    }
+  ],
+  "firewall": {
+    "accessRules": [
+      {
+        "mode": "whitelist",
+        "configuration": {
+          "target": "country",
+          "value": "US"
+        },
+        "notes": "Allow US traffic"
+      },
+      {
+        "mode": "whitelist",
+        "configuration": {
+          "target": "country",
+          "value": "CA"
+        },
+        "notes": "Allow Canadian traffic"
+      },
+      {
+        "mode": "block",
+        "configuration": {
+          "target": "ip",
+          "value": "0.0.0.0/0"
+        },
+        "notes": "Block malicious IPs"
+      }
+    ],
+    "userAgentRules": [
+      {
+        "mode": "block",
+        "configuration": {
+          "target": "ua",
+          "value": "*bot*"
+        },
+        "notes": "Block bots from video endpoints"
+      }
+    ]
+  },
+  "monitoring": {
+    "notifications": [
+      {
+        "name": "video-cdn-alerts",
+        "type": "email",
+        "destinations": [
+          "${ADMIN_EMAIL}"
+        ],
+        "alert_type": "zone_aop_increase",
+        "threshold": 500
+      },
+      {
+        "name": "video-error-alerts",
+        "type": "webhook",
+        "destinations": [
+          "${SLACK_WEBHOOK_URL}"
+        ],
+        "alert_type": "zone_error_rate_increase",
+        "threshold": 5
+      }
+    ]
+  },
+  "deployment": {
+    "terraform": {
+      "provider": "cloudflare",
+      "version": "~> 4.0",
+      "variables": {
+        "cloudflare_api_token": "${CLOUDFLARE_API_TOKEN}",
+        "cloudflare_zone_id": "${CLOUDFLARE_ZONE_ID}",
+        "cloudflare_account_id": "${CLOUDFLARE_ACCOUNT_ID}",
+        "domain": "${DOMAIN}",
+        "origin_server": "${ORIGIN_SERVER}"
+      }
+    },
+    "environmentVariables": [
+      "CLOUDFLARE_API_TOKEN",
+      "CLOUDFLARE_ZONE_ID",
+      "CLOUDFLARE_ACCOUNT_ID",
+      "VIDEO_CDN_DOMAIN",
+      "ORIGIN_SERVER_IP",
+      "FALLBACK_SERVER_IP",
+      "DOMAIN",
+      "GA_MEASUREMENT_ID",
+      "S3_BUCKET",
+      "WATERMARK_UID",
+      "ADMIN_EMAIL",
+      "SLACK_WEBHOOK_URL"
+    ]
+  },
+  "compliance": {
+    "gdpr": {
+      "enabled": true,
+      "cookieConsent": true,
+      "dataRetention": 365
+    },
+    "ccpa": {
+      "enabled": true,
+      "doNotSell": true
+    },
+    "coppa": {
+      "enabled": true,
+      "ageVerification": true
+    }
+  },
+  "backup": {
+    "configBackup": {
+      "enabled": true,
+      "frequency": "daily",
+      "retention": 30,
+      "destination": "s3://${BACKUP_BUCKET}/cloudflare-config/"
+    },
+    "dnsBackup": {
+      "enabled": true,
+      "frequency": "hourly",
+      "retention": 168,
+      "destination": "s3://${BACKUP_BUCKET}/dns-records/"
+    }
+  }
+}

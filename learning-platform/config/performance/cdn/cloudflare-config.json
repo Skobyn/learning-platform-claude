@@ -1,0 +1,123 @@
+{
+  "cdn": {
+    "provider": "cloudflare",
+    "zone_id": "${CLOUDFLARE_ZONE_ID}",
+    "api_token": "${CLOUDFLARE_API_TOKEN}",
+    "domain": "${DOMAIN_NAME}",
+    "settings": {
+      "ssl": {
+        "mode": "strict",
+        "universal_ssl": true,
+        "edge_certificates": true
+      },
+      "performance": {
+        "minify": {
+          "css": true,
+          "js": true,
+          "html": true
+        },
+        "brotli": true,
+        "early_hints": true,
+        "http3": true,
+        "zero_rtt": true,
+        "tls_1_3": true
+      },
+      "caching": {
+        "browser_ttl": 31536000,
+        "edge_ttl": 2678400,
+        "development_mode": false,
+        "cache_level": "aggressive",
+        "bypass_cache_on_cookie": false
+      },
+      "security": {
+        "security_level": "medium",
+        "challenge_ttl": 1800,
+        "browser_check": true,
+        "hotlink_protection": false,
+        "email_obfuscation": true
+      }
+    },
+    "page_rules": [
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*/api/*"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "bypass"
+          }
+        ]
+      },
+      {
+        "targets": [
+          {
+            "target": "url",
+            "constraint": {
+              "operator": "matches",
+              "value": "*/_next/static/*"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 31536000
+          },
+          {
+            "id": "browser_cache_ttl",
+            "value": 31536000
+          }
+        ]
+      },
+      {
+        "targets": [
+          {
+            "target": "url", 
+            "constraint": {
+              "operator": "matches",
+              "value": "*.{jpg,jpeg,png,gif,ico,svg,webp,avif,css,js,woff,woff2,ttf,eot}"
+            }
+          }
+        ],
+        "actions": [
+          {
+            "id": "cache_level",
+            "value": "cache_everything"
+          },
+          {
+            "id": "edge_cache_ttl",
+            "value": 2678400
+          },
+          {
+            "id": "browser_cache_ttl", 
+            "value": 604800
+          }
+        ]
+      }
+    ]
+  },
+  "performance_metrics": {
+    "expected_improvements": {
+      "ttfb_reduction": "40-60%",
+      "cache_hit_ratio": ">95%",
+      "bandwidth_savings": "30-50%",
+      "global_latency": "<100ms"
+    },
+    "monitoring": {
+      "core_web_vitals": true,
+      "real_user_monitoring": true,
+      "synthetic_monitoring": true
+    }
+  }
+}

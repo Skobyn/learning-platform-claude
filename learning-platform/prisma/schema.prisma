@@ -15,24 +15,31 @@ model User {
   id                String   @id @default(cuid())
   email             String   @unique
   emailVerified     DateTime?
-  firstName         String
-  lastName          String
-  hashedPassword    String
+  firstName         String?
+  lastName          String?
+  displayName       String?
+  hashedPassword    String?
+  authProvider      AuthProvider @default(LOCAL)
+  authProviderId    String?
   role              Role     @default(LEARNER)
   profilePicture    String?
   bio               String?
   isActive          Boolean  @default(true)
   requires2FA       Boolean  @default(false)
-  lastLogin         DateTime?
+  lastLoginAt       DateTime?
+  department        String?
+  jobTitle          String?
+  employeeId        String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
+
   // Organization relationship
   organizationId    String?
   organization      Organization? @relation(fields: [organizationId], references: [id])
-  
-  // User preferences
+
+  // User preferences and profile
   preferences       UserPreferences?
+  profile           Profile?
   
   // Learning data
   enrollments       Enrollment[]
@@ -46,10 +53,24 @@ model User {
   
   // Session management
   sessions          UserSession[]
-  
+
   // Notifications
   notifications     Notification[]
-  
+
+  // Authentication & Security
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  mfaSettings            MfaSetting?
+  trustedDevices         TrustedDevice[]
+  oauthAccounts          OauthAccount[]
+
+  // Media & Content
+  uploadedFiles          MediaFile[]
+  certificates          Certificate[]
+  activityLogs          ActivityLog[]
+  videoWatchProgress    VideoWatchProgress[]
+  videoStreamingTokens  VideoStreamingToken[]
+
   @@map("users")
 }
 
@@ -83,27 +104,38 @@ model Organization {
   id          String @id @default(cuid())
   name        String
   code        String @unique
-  domain      String?
+  domains     String[] // Email domains for auto-enrollment
   logo        String?
-  settings    Json?
+  settings    OrganizationSettings?
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   users       User[]
   courses     Course[]
-  
+  ssoProviders SsoProvider[]
+  ipWhitelistRules IpWhitelistRule[]
+
   @@map("organizations")
 }
 
 model UserSession {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceFingerprint String
+  ipAddress         String
+  userAgent         String
+  provider          AuthProvider @default(LOCAL)
+  sessionData       Json?
+  isActive          Boolean  @default(true)
+  expiresAt         DateTime
+  lastAccessAt      DateTime @default(now())
+  invalidatedAt     DateTime?
+  invalidationReason String?
+  createdAt         DateTime @default(now())
+
+  @@unique([userId, provider])
   @@map("user_sessions")
 }
 
@@ -134,6 +166,10 @@ model Course {
   
   // Learning data
   enrollments       Enrollment[]
+  
+  // New feature relations
+  videos            Video[]
+  certificates      Certificate[]
   
   // Metadata
   enrollmentCount   Int      @default(0)
@@ -191,6 +227,9 @@ model Lesson {
   
   // Progress tracking
   progress          Progress[]
+  
+  // New feature relations
+  videos            Video[]
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -471,4 +510,456 @@ enum NotificationType {
   ENROLLMENT_CONFIRMATION
   COURSE_COMPLETED
   SYSTEM_ANNOUNCEMENT
+}
+
+// Additional models for new features
+
+// Password Reset Tokens
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
+}
+
+// Email Verification Tokens
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("email_verification_tokens")
+}
+
+// Media Files (for uploads)
+model MediaFile {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  thumbnailUrl String?
+  uploadedBy   String
+  uploader     User     @relation(fields: [uploadedBy], references: [id])
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  // Relations to videos
+  videos       Video[]
+
+  @@map("media_files")
+}
+
+// Video Streaming
+model Video {
+  id               String    @id @default(cuid())
+  mediaFileId      String
+  mediaFile        MediaFile @relation(fields: [mediaFileId], references: [id])
+  courseId         String?
+  course           Course?   @relation(fields: [courseId], references: [id])
+  lessonId         String?
+  lesson           Lesson?   @relation(fields: [lessonId], references: [id])
+  originalFilename String
+  status           VideoStatus @default(PROCESSING)
+  processedAt      DateTime?
+  metadata         Json?
+  createdAt        DateTime  @default(now())
+
+  // Relations
+  watchProgress    VideoWatchProgress[]
+  streamingTokens  VideoStreamingToken[]
+
+  @@map("videos")
+}
+
+model VideoWatchProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoId     String
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  position    Int      @default(0) // in seconds
+  duration    Int      @default(0) // in seconds
+  completed   Boolean  @default(false)
+  lastWatched DateTime @default(now())
+
+  @@unique([userId, videoId])
+  @@map("video_watch_progress")
+}
+
+model VideoStreamingToken {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  videoId     String
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions String[] // JSON array of permissions
+  expiresAt   DateTime
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@map("video_streaming_tokens")
+}
+
+// Certificates
+model Certificate {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  courseId         String
+  course           Course   @relation(fields: [courseId], references: [id])
+  templateId       String
+  verificationCode String   @unique
+  pdfUrl           String
+  issuedAt         DateTime @default(now())
+  metadata         Json?
+
+  @@map("certificates")
+}
+
+// Activity Logs (for security and auditing)
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+enum VideoStatus {
+  PROCESSING
+  READY
+  ERROR
+}
+
+// Authentication and Security Models
+
+// User Profile (separated from User for cleaner organization)
+model Profile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bio       String?
+  avatar    String?
+  website   String?
+  location  String?
+  preferences Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+// Organization Settings
+model OrganizationSettings {
+  id                        String      @id @default(cuid())
+  organizationId           String      @unique
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Authentication settings
+  requireMFA               Boolean     @default(false)
+  allowSelfRegistration    Boolean     @default(true)
+  allowTrustedDeviceSkipMFA Boolean    @default(false)
+  sessionTimeout           Int         @default(480) // minutes
+  maxConcurrentSessions    Int         @default(3)
+
+  // IP Whitelist settings
+  ipWhitelistEnabled       Boolean     @default(false)
+  ipWhitelist              String[]    @default([])
+
+  // Password policy
+  passwordMinLength        Int         @default(8)
+  passwordRequireNumbers   Boolean     @default(true)
+  passwordRequireSymbols   Boolean     @default(true)
+  passwordRequireUppercase Boolean     @default(true)
+  passwordRequireLowercase Boolean     @default(true)
+  passwordExpiryDays       Int?        @default(90)
+
+  // Other settings
+  enforceEmailVerification Boolean     @default(true)
+  allowPasswordReset       Boolean     @default(true)
+
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+
+  @@map("organization_settings")
+}
+
+// Multi-Factor Authentication
+model MfaSetting {
+  id              String @id @default(cuid())
+  userId          String @unique
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isEnabled       Boolean @default(false)
+  method          MfaMethod @default(TOTP)
+  secret          String
+  backupCodes     String[] @default([])
+
+  lastUsedAt      DateTime?
+  failedAttempts  Int      @default(0)
+  lastFailedAt    DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("mfa_settings")
+}
+
+// Device Trust Management
+model TrustedDevice {
+  id              String @id @default(cuid())
+  userId          String
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fingerprint     String
+  name            String
+  deviceInfo      Json
+  isTrusted       Boolean @default(false)
+  trustLevel      TrustLevel @default(LOW)
+
+  lastUsedAt      DateTime @default(now())
+  expiresAt       DateTime?
+  isActive        Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, fingerprint])
+  @@map("trusted_devices")
+}
+
+// OAuth Account Linking
+model OauthAccount {
+  id            String @id @default(cuid())
+  userId        String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider      AuthProvider
+  providerId    String
+  accessToken   String
+  refreshToken  String?
+  profile       Json
+
+  expiresAt     DateTime?
+  lastUsedAt    DateTime @default(now())
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@unique([provider, providerId])
+  @@map("oauth_accounts")
+}
+
+// SSO Provider Configuration
+model SsoProvider {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name              String
+  displayName       String
+  type              SsoType
+  config            Json
+  isActive          Boolean      @default(true)
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@map("sso_providers")
+}
+
+// IP Whitelist Rules
+model IpWhitelistRule {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name             String
+  ipAddress        String?
+  ipRange          String?
+  ruleType         IpRuleType
+  description      String?
+  isActive         Boolean      @default(true)
+  metadata         Json?
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("ip_whitelist_rules")
+}
+
+// Audit Logs for Security Events
+model AuditLog {
+  id           String @id @default(cuid())
+  userId       String?
+  sessionId    String?
+  event        String
+  provider     String?
+  ipAddress    String?
+  userAgent    String?
+  success      Boolean
+  metadata     Json?
+  timestamp    DateTime @default(now())
+  riskLevel    RiskLevel @default(LOW)
+  organizationId String?
+  resourceId   String?
+  resourceType String?
+
+  @@index([userId])
+  @@index([event])
+  @@index([timestamp])
+  @@index([riskLevel])
+  @@index([success])
+  @@map("audit_logs")
+}
+
+// Security Alerts
+model SecurityAlert {
+  id             String @id @default(cuid())
+  type           AlertType
+  severity       AlertSeverity
+  userId         String?
+  organizationId String?
+  description    String
+  metadata       Json
+  isResolved     Boolean @default(false)
+  resolvedBy     String?
+  resolvedAt     DateTime?
+
+  createdAt      DateTime @default(now())
+
+  @@index([type])
+  @@index([severity])
+  @@index([isResolved])
+  @@index([createdAt])
+  @@map("security_alerts")
+}
+
+// Pending Sessions (for MFA flow)
+model PendingSession {
+  id        String   @id @default(cuid())
+  userId    String
+  data      Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("pending_sessions")
+}
+
+// Group to Role Mapping (for SAML attribute mapping)
+model GroupRoleMapping {
+  id             String @id @default(cuid())
+  organizationId String
+  groupName      String
+  roleId         String
+  role           UserRole @relation(fields: [roleId], references: [id])
+
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, groupName])
+  @@map("group_role_mappings")
+}
+
+// User Roles (for RBAC)
+model UserRole {
+  id             String @id @default(cuid())
+  userId         String
+  roleId         String
+  organizationId String?
+
+  groupMappings  GroupRoleMapping[]
+
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, roleId, organizationId])
+  @@map("user_roles")
+}
+
+// New Enums for Authentication
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  MICROSOFT
+  LINKEDIN
+  SAML
+  OAUTH
+}
+
+enum MfaMethod {
+  TOTP
+  SMS
+  EMAIL
+}
+
+enum TrustLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SsoType {
+  SAML
+  OAUTH
+  OIDC
+}
+
+enum IpRuleType {
+  SINGLE_IP
+  IP_RANGE
+  CIDR
+  COUNTRY
+  REGION
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertType {
+  SUSPICIOUS_LOGIN
+  MULTIPLE_FAILURES
+  UNUSUAL_LOCATION
+  PRIVILEGE_ESCALATION
+  DATA_BREACH
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }

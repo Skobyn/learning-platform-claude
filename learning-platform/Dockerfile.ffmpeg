@@ -1,0 +1,81 @@
+# FFmpeg transcoding worker Dockerfile
+FROM jrottenberg/ffmpeg:4.4-alpine
+
+# Install Node.js and additional dependencies
+RUN apk add --no-cache \
+    nodejs \
+    npm \
+    python3 \
+    make \
+    g++ \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Create working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy application source
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Build TypeScript
+RUN npm run build
+
+# Create temp directory for video processing
+RUN mkdir -p /tmp/video-processing && chmod 777 /tmp/video-processing
+
+# Create non-root user
+RUN addgroup -g 1001 -S ffmpeg && \
+    adduser -S ffmpeg -u 1001 -G ffmpeg
+
+# Set ownership
+RUN chown -R ffmpeg:ffmpeg /app /tmp/video-processing
+
+# Health check script
+COPY <<EOF /app/healthcheck.js
+const http = require('http');
+const options = {
+  host: 'localhost',
+  port: process.env.HEALTH_PORT || 3000,
+  path: '/health',
+  timeout: 2000,
+};
+
+const request = http.request(options, (res) => {
+  console.log('Health check status:', res.statusCode);
+  process.exit(res.statusCode === 200 ? 0 : 1);
+});
+
+request.on('error', (err) => {
+  console.error('Health check error:', err);
+  process.exit(1);
+});
+
+request.end();
+EOF
+
+# Switch to non-root user
+USER ffmpeg
+
+# Expose health check port
+EXPOSE 3000
+
+# Environment variables
+ENV NODE_ENV=production
+ENV FFMPEG_PATH=/usr/local/bin/ffmpeg
+ENV FFPROBE_PATH=/usr/local/bin/ffprobe
+
+# Start the FFmpeg worker
+CMD ["node", "dist/workers/video-processor.js"]
+
+# Labels for metadata
+LABEL maintainer="Learning Platform Team"
+LABEL version="1.0"
+LABEL description="FFmpeg transcoding worker for video processing"

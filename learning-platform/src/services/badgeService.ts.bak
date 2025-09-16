@@ -1,0 +1,611 @@
+import { PrismaClient } from '@prisma/client';
+import { Badge, BadgeType, BadgeCriteria, UserBadge, Certificate, User, Course, Enrollment } from '../types';
+import { NotFoundError, ValidationError } from '../utils/errors';
+import logger from '../utils/logger';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { v4 as uuidv4 } from 'uuid';
+
+const prisma = new PrismaClient();
+
+export class BadgeService {
+  /**
+   * Create a new badge
+   */
+  async createBadge(badgeData: Omit<Badge, 'id' | 'createdAt' | 'updatedAt'>): Promise<Badge> {
+    try {
+      logger.info('Creating new badge', { name: badgeData.name });
+      
+      const badge = await prisma.achievement.create({
+        data: {
+          type: 'BADGE',
+          title: badgeData.name,
+          description: badgeData.description,
+          level: 'BRONZE',
+          userId: '', // This needs to be provided
+          verificationCode: uuidv4()
+        }
+      });
+
+      logger.info('Badge created successfully', { badgeId: badge.id });
+      return badge as Badge;
+    } catch (error) {
+      logger.error('Error creating badge', error);
+      throw new ValidationError('Failed to create badge');
+    }
+  }
+
+  /**
+   * Get badge by ID
+   */
+  async getBadgeById(badgeId: string): Promise<Badge> {
+    try {
+      const badge = await prisma.achievement.findUnique({
+        where: { id: badgeId }
+      });
+
+      if (!badge) {
+        throw new NotFoundError('Badge not found');
+      }
+
+      return badge as Badge;
+    } catch (error) {
+      if (error instanceof NotFoundError) throw error;
+      logger.error('Error fetching badge', { badgeId, error });
+      throw new ValidationError('Failed to fetch badge');
+    }
+  }
+
+  /**
+   * Get all active badges
+   */
+  async getActiveBadges(): Promise<Badge[]> {
+    try {
+      const badges = await prisma.achievement.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      return badges as Badge[];
+    } catch (error) {
+      logger.error('Error fetching active badges', error);
+      throw new ValidationError('Failed to fetch active badges');
+    }
+  }
+
+  /**
+   * Award badge to user
+   */
+  async awardBadge(userId: string, badgeId: string): Promise<UserBadge> {
+    try {
+      logger.info('Awarding badge to user', { userId, badgeId });
+      
+      // Check if user already has this badge
+      const existingBadge = await prisma.achievement.findFirst({
+        where: { userId, badgeId }
+      });
+
+      if (existingBadge) {
+        throw new ValidationError('User already has this badge');
+      }
+
+      const userBadge = await prisma.achievement.create({
+        data: {
+          userId,
+          badgeId,
+          earnedAt: new Date(),
+          verificationCode: this.generateVerificationCode()
+        }
+      });
+
+      // Send notification about badge earned
+      await this.sendBadgeNotification(userId, badgeId);
+
+      logger.info('Badge awarded successfully', { userBadgeId: userBadge.id });
+      return userBadge as UserBadge;
+    } catch (error) {
+      if (error instanceof ValidationError) throw error;
+      logger.error('Error awarding badge', { userId, badgeId, error });
+      throw new ValidationError('Failed to award badge');
+    }
+  }
+
+  /**
+   * Get user's badges
+   */
+  async getUserBadges(userId: string): Promise<UserBadge[]> {
+    try {
+      const userBadges = await prisma.achievement.findMany({
+        where: { userId },
+        include: {
+          badge: true
+        },
+        orderBy: { earnedAt: 'desc' }
+      });
+
+      return userBadges as UserBadge[];
+    } catch (error) {
+      logger.error('Error fetching user badges', { userId, error });
+      throw new ValidationError('Failed to fetch user badges');
+    }
+  }
+
+  /**
+   * Check and award automatic badges based on user activity
+   */
+  async checkAndAwardAutomaticBadges(userId: string): Promise<UserBadge[]> {
+    try {
+      logger.info('Checking automatic badges for user', { userId });
+      
+      const activeBadges = await this.getActiveBadges();
+      const userBadges = await this.getUserBadges(userId);
+      const earnedBadgeIds = userBadges.map(ub => ub.badgeId);
+      
+      const awardedBadges: UserBadge[] = [];
+
+      for (const badge of activeBadges) {
+        if (earnedBadgeIds.includes(badge.id)) continue;
+
+        const eligible = await this.checkBadgeEligibility(userId, badge);
+        if (eligible) {
+          const userBadge = await this.awardBadge(userId, badge.id);
+          awardedBadges.push(userBadge);
+        }
+      }
+
+      logger.info('Automatic badge check completed', { userId, awardedCount: awardedBadges.length });
+      return awardedBadges;
+    } catch (error) {
+      logger.error('Error checking automatic badges', { userId, error });
+      throw new ValidationError('Failed to check automatic badges');
+    }
+  }
+
+  /**
+   * Check if user is eligible for a specific badge
+   */
+  private async checkBadgeEligibility(userId: string, badge: Badge): Promise<boolean> {
+    try {
+      const criteria = badge.criteria;
+      
+      switch (criteria.type) {
+        case BadgeType.COURSE_COMPLETION:
+          return await this.checkCourseCompletionCriteria(userId, criteria.requirements);
+        
+        case BadgeType.QUIZ_MASTERY:
+          return await this.checkQuizMasteryCriteria(userId, criteria.requirements);
+        
+        case BadgeType.STREAK:
+          return await this.checkStreakCriteria(userId, criteria.requirements);
+        
+        case BadgeType.PARTICIPATION:
+          return await this.checkParticipationCriteria(userId, criteria.requirements);
+        
+        case BadgeType.SKILL:
+          return await this.checkSkillCriteria(userId, criteria.requirements);
+        
+        default:
+          return false;
+      }
+    } catch (error) {
+      logger.error('Error checking badge eligibility', { userId, badgeId: badge.id, error });
+      return false;
+    }
+  }
+
+  /**
+   * Check course completion criteria
+   */
+  private async checkCourseCompletionCriteria(userId: string, requirements: any): Promise<boolean> {
+    const { courseIds, minCourses, category } = requirements;
+    
+    let query: any = {
+      userId,
+      status: 'completed'
+    };
+
+    if (courseIds) {
+      query.courseId = { in: courseIds };
+    }
+
+    if (category) {
+      query.course = {
+        categoryId: category
+      };
+    }
+
+    const completedCourses = await prisma.enrollment.count({
+      where: query
+    });
+
+    return completedCourses >= (minCourses || 1);
+  }
+
+  /**
+   * Check quiz mastery criteria
+   */
+  private async checkQuizMasteryCriteria(userId: string, requirements: any): Promise<boolean> {
+    const { minScore, minAttempts } = requirements;
+    
+    const quizAttempts = await prisma.quizAttempt.count({
+      where: {
+        userId,
+        score: { gte: minScore || 80 },
+        passed: true
+      }
+    });
+
+    return quizAttempts >= (minAttempts || 1);
+  }
+
+  /**
+   * Check streak criteria (consecutive days of activity)
+   */
+  private async checkStreakCriteria(userId: string, requirements: any): Promise<boolean> {
+    const { days } = requirements;
+    
+    // This would require tracking daily activity - simplified for now
+    const recentActivity = await prisma.analyticsEvent.count({
+      where: {
+        userId,
+        timestamp: {
+          gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    return recentActivity >= days;
+  }
+
+  /**
+   * Check participation criteria
+   */
+  private async checkParticipationCriteria(userId: string, requirements: any): Promise<boolean> {
+    const { minEvents } = requirements;
+    
+    const eventCount = await prisma.analyticsEvent.count({
+      where: { userId }
+    });
+
+    return eventCount >= (minEvents || 10);
+  }
+
+  /**
+   * Check skill criteria (based on completed courses in specific areas)
+   */
+  private async checkSkillCriteria(userId: string, requirements: any): Promise<boolean> {
+    const { skills, minCoursesPerSkill } = requirements;
+    
+    for (const skill of skills) {
+      const skillCourses = await prisma.enrollment.count({
+        where: {
+          userId,
+          status: 'completed',
+          course: {
+            tags: { hasSome: [skill] }
+          }
+        }
+      });
+
+      if (skillCourses < (minCoursesPerSkill || 1)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Generate certificate for course completion
+   */
+  async generateCertificate(userId: string, courseId: string): Promise<Certificate> {
+    try {
+      logger.info('Generating certificate', { userId, courseId });
+      
+      // Verify user completed the course
+      const enrollment = await prisma.enrollment.findFirst({
+        where: {
+          userId,
+          courseId,
+          status: 'completed'
+        },
+        include: {
+          user: true,
+          course: true
+        }
+      });
+
+      if (!enrollment) {
+        throw new ValidationError('User has not completed this course');
+      }
+
+      // Check if certificate already exists
+      const existingCert = await prisma.certificate.findFirst({
+        where: { userId, courseId }
+      });
+
+      if (existingCert) {
+        return existingCert as Certificate;
+      }
+
+      // Generate PDF certificate
+      const pdfBuffer = await this.createCertificatePDF(enrollment);
+      const pdfUrl = await this.saveCertificatePDF(pdfBuffer, userId, courseId);
+
+      const certificate = await prisma.certificate.create({
+        data: {
+          userId,
+          courseId,
+          templateId: 'default',
+          issuedAt: new Date(),
+          verificationCode: this.generateVerificationCode(),
+          pdfUrl
+        }
+      });
+
+      // Send notification
+      await this.sendCertificateNotification(userId, courseId);
+
+      logger.info('Certificate generated successfully', { certificateId: certificate.id });
+      return certificate as Certificate;
+    } catch (error) {
+      if (error instanceof ValidationError) throw error;
+      logger.error('Error generating certificate', { userId, courseId, error });
+      throw new ValidationError('Failed to generate certificate');
+    }
+  }
+
+  /**
+   * Verify certificate authenticity
+   */
+  async verifyCertificate(verificationCode: string): Promise<Certificate | null> {
+    try {
+      const certificate = await prisma.certificate.findFirst({
+        where: { verificationCode },
+        include: {
+          user: true,
+          course: true
+        }
+      });
+
+      return certificate as Certificate;
+    } catch (error) {
+      logger.error('Error verifying certificate', { verificationCode, error });
+      throw new ValidationError('Failed to verify certificate');
+    }
+  }
+
+  /**
+   * Get user's certificates
+   */
+  async getUserCertificates(userId: string): Promise<Certificate[]> {
+    try {
+      const certificates = await prisma.certificate.findMany({
+        where: { userId },
+        include: {
+          course: true
+        },
+        orderBy: { issuedAt: 'desc' }
+      });
+
+      return certificates as Certificate[];
+    } catch (error) {
+      logger.error('Error fetching user certificates', { userId, error });
+      throw new ValidationError('Failed to fetch user certificates');
+    }
+  }
+
+  /**
+   * Create PDF certificate document
+   */
+  private async createCertificatePDF(enrollment: any): Promise<Buffer> {
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([792, 612]); // Letter size landscape
+    
+    const { width, height } = page.getSize();
+    
+    // Add certificate content
+    page.drawText('CERTIFICATE OF COMPLETION', {
+      x: width / 2 - 150,
+      y: height - 150,
+      size: 24,
+      color: rgb(0, 0.2, 0.8)
+    });
+
+    page.drawText(`This certifies that`, {
+      x: width / 2 - 80,
+      y: height - 200,
+      size: 14
+    });
+
+    page.drawText(`${enrollment.user.firstName} ${enrollment.user.lastName}`, {
+      x: width / 2 - 100,
+      y: height - 250,
+      size: 20,
+      color: rgb(0.2, 0.2, 0.2)
+    });
+
+    page.drawText(`has successfully completed the course`, {
+      x: width / 2 - 120,
+      y: height - 300,
+      size: 14
+    });
+
+    page.drawText(`"${enrollment.course.title}"`, {
+      x: width / 2 - 100,
+      y: height - 350,
+      size: 18,
+      color: rgb(0, 0.2, 0.8)
+    });
+
+    page.drawText(`Completed on: ${enrollment.completedAt.toDateString()}`, {
+      x: width / 2 - 80,
+      y: height - 400,
+      size: 12
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    return Buffer.from(pdfBytes);
+  }
+
+  /**
+   * Save certificate PDF to storage
+   */
+  private async saveCertificatePDF(pdfBuffer: Buffer, userId: string, courseId: string): Promise<string> {
+    // In a real implementation, this would upload to cloud storage (S3, etc.)
+    // For now, return a placeholder URL
+    const filename = `certificate_${userId}_${courseId}_${Date.now()}.pdf`;
+    const url = `/certificates/${filename}`;
+    
+    // TODO: Implement actual file upload to storage service
+    
+    return url;
+  }
+
+  /**
+   * Generate verification code
+   */
+  private generateVerificationCode(): string {
+    return uuidv4().replace(/-/g, '').substring(0, 12).toUpperCase();
+  }
+
+  /**
+   * Send badge earned notification
+   */
+  private async sendBadgeNotification(userId: string, badgeId: string): Promise<void> {
+    try {
+      const badge = await this.getBadgeById(badgeId);
+      
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: 'badge_earned',
+          title: 'Badge Earned!',
+          message: `Congratulations! You've earned the "${badge.name}" badge.`,
+          data: { badgeId },
+          isRead: false
+        }
+      });
+    } catch (error) {
+      logger.error('Error sending badge notification', { userId, badgeId, error });
+    }
+  }
+
+  /**
+   * Send certificate notification
+   */
+  private async sendCertificateNotification(userId: string, courseId: string): Promise<void> {
+    try {
+      const course = await prisma.course.findUnique({
+        where: { id: courseId }
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: 'certificate_issued',
+          title: 'Certificate Ready!',
+          message: `Your certificate for "${course?.title}" is now available for download.`,
+          data: { courseId },
+          isRead: false
+        }
+      });
+    } catch (error) {
+      logger.error('Error sending certificate notification', { userId, courseId, error });
+    }
+  }
+
+  /**
+   * Update badge details
+   */
+  async updateBadge(badgeId: string, updates: Partial<Badge>): Promise<Badge> {
+    try {
+      logger.info('Updating badge', { badgeId });
+      
+      const badge = await prisma.achievement.update({
+        where: { id: badgeId },
+        data: {
+          ...updates,
+          criteria: updates.criteria as any,
+          updatedAt: new Date()
+        }
+      });
+
+      logger.info('Badge updated successfully', { badgeId });
+      return badge as Badge;
+    } catch (error) {
+      logger.error('Error updating badge', { badgeId, error });
+      throw new ValidationError('Failed to update badge');
+    }
+  }
+
+  /**
+   * Deactivate badge
+   */
+  async deactivateBadge(badgeId: string): Promise<void> {
+    try {
+      logger.info('Deactivating badge', { badgeId });
+      
+      await prisma.achievement.update({
+        where: { id: badgeId },
+        data: { isActive: false }
+      });
+
+      logger.info('Badge deactivated successfully', { badgeId });
+    } catch (error) {
+      logger.error('Error deactivating badge', { badgeId, error });
+      throw new ValidationError('Failed to deactivate badge');
+    }
+  }
+
+  /**
+   * Get badge leaderboard (users with most badges)
+   */
+  async getBadgeLeaderboard(limit = 10): Promise<Array<{
+    user: User;
+    badgeCount: number;
+    recentBadges: UserBadge[];
+  }>> {
+    try {
+      const userBadgeCounts = await prisma.achievement.groupBy({
+        by: ['userId'],
+        _count: {
+          id: true
+        },
+        orderBy: {
+          _count: {
+            id: 'desc'
+          }
+        },
+        take: limit
+      });
+
+      const leaderboard = await Promise.all(
+        userBadgeCounts.map(async (item) => {
+          const user = await prisma.user.findUnique({
+            where: { id: item.userId }
+          });
+
+          const recentBadges = await prisma.achievement.findMany({
+            where: { userId: item.userId },
+            include: { badge: true },
+            orderBy: { earnedAt: 'desc' },
+            take: 3
+          });
+
+          return {
+            user: user as User,
+            badgeCount: item._count.id,
+            recentBadges: recentBadges as UserBadge[]
+          };
+        })
+      );
+
+      return leaderboard;
+    } catch (error) {
+      logger.error('Error fetching badge leaderboard', error);
+      throw new ValidationError('Failed to fetch badge leaderboard');
+    }
+  }
+}
+
+export const badgeService = new BadgeService();

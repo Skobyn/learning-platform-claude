@@ -150,12 +150,12 @@ export function Chart({
     const commonProps = {
       data: chartData,
       margin,
-      width,
+      width: width || 400,
       height,
     };
 
     const tooltipComponent = customTooltip ? (
-      <Tooltip content={customTooltip} />
+      <Tooltip content={customTooltip as any} />
     ) : showTooltip ? (
       <Tooltip 
         content={(props) => (
@@ -175,7 +175,7 @@ export function Chart({
             <LineChart {...commonProps}>
               {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />}
               <XAxis 
-                dataKey={xKey} 
+                dataKey={xKey || 'name'} 
                 stroke="#6B7280"
                 fontSize={12}
                 tickLine={false}
@@ -198,8 +198,8 @@ export function Chart({
                     dataKey={key}
                     stroke={colors[index % colors.length]}
                     strokeWidth={2}
-                    dot={{ fill: colors[index % colors.length], strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: colors[index % colors.length], strokeWidth: 2 }}
+                    dot={{ fill: colors[index % colors.length] || '#8884d8', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: colors[index % colors.length] || '#8884d8', strokeWidth: 2 }}
                     animationBegin={animationBegin}
                     animationDuration={animationDuration}
                   />
@@ -207,11 +207,11 @@ export function Chart({
               ) : (
                 <Line
                   type="monotone"
-                  dataKey={yKey}
+                  dataKey={yKey || 'value'}
                   stroke={colors[0]}
                   strokeWidth={2}
-                  dot={{ fill: colors[0], strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: colors[0], strokeWidth: 2 }}
+                  dot={{ fill: colors[0] || '#8884d8', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, stroke: colors[0] || '#8884d8', strokeWidth: 2 }}
                   animationBegin={animationBegin}
                   animationDuration={animationDuration}
                 />
@@ -225,7 +225,7 @@ export function Chart({
           <ResponsiveContainer width="100%" height={height}>
             <AreaChart {...commonProps}>
               {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />}
-              <XAxis dataKey={xKey} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey={xKey || 'name'} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               {tooltipComponent}
               {showLegend && <Legend />}
@@ -237,7 +237,7 @@ export function Chart({
                     dataKey={key}
                     stackId="1"
                     stroke={colors[index % colors.length]}
-                    fill={colors[index % colors.length]}
+                    fill={colors[index % colors.length] || '#8884d8'}
                     fillOpacity={0.6}
                     animationBegin={animationBegin}
                     animationDuration={animationDuration}
@@ -246,9 +246,9 @@ export function Chart({
               ) : (
                 <Area
                   type="monotone"
-                  dataKey={yKey}
+                  dataKey={yKey || 'value'}
                   stroke={colors[0]}
-                  fill={colors[0]}
+                  fill={colors[0] || '#8884d8'}
                   fillOpacity={0.6}
                   animationBegin={animationBegin}
                   animationDuration={animationDuration}
@@ -263,7 +263,7 @@ export function Chart({
           <ResponsiveContainer width="100%" height={height}>
             <BarChart {...commonProps}>
               {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />}
-              <XAxis dataKey={xKey} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey={xKey || 'name'} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               {tooltipComponent}
               {showLegend && <Legend />}
@@ -272,7 +272,7 @@ export function Chart({
                   <Bar
                     key={key}
                     dataKey={key}
-                    fill={colors[index % colors.length]}
+                    fill={colors[index % colors.length] || '#8884d8'}
                     radius={[2, 2, 0, 0]}
                     animationBegin={animationBegin}
                     animationDuration={animationDuration}
@@ -280,8 +280,8 @@ export function Chart({
                 ))
               ) : (
                 <Bar
-                  dataKey={yKey}
-                  fill={colors[0]}
+                  dataKey={yKey || 'value'}
+                  fill={colors[0] || '#8884d8'}
                   radius={[2, 2, 0, 0]}
                   animationBegin={animationBegin}
                   animationDuration={animationDuration}
@@ -300,15 +300,15 @@ export function Chart({
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
                 outerRadius={80}
                 fill="#8884d8"
-                dataKey={yKey || 'value'}
+                dataKey={typeof yKey === 'string' ? yKey : 'value'}
                 animationBegin={animationBegin}
                 animationDuration={animationDuration}
               >
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length] || '#8884d8'} />
                 ))}
               </Pie>
               {tooltipComponent}
@@ -322,13 +322,13 @@ export function Chart({
           <ResponsiveContainer width="100%" height={height}>
             <ScatterChart {...commonProps}>
               {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />}
-              <XAxis dataKey={xKey} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey={xKey || 'name'} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               {tooltipComponent}
               {showLegend && <Legend />}
               <Scatter
-                dataKey={yKey}
-                fill={colors[0]}
+                dataKey={typeof yKey === 'string' ? yKey : 'value'}
+                fill={colors[0] || '#8884d8'}
                 animationBegin={animationBegin}
                 animationDuration={animationDuration}
               />
@@ -341,9 +341,9 @@ export function Chart({
           <ResponsiveContainer width="100%" height={height}>
             <RadialBarChart cx="50%" cy="50%" innerRadius="10%" outerRadius="80%" data={chartData}>
               <RadialBar
-                dataKey={yKey || 'value'}
+                dataKey={typeof yKey === 'string' ? yKey : 'value'}
                 cornerRadius={4}
-                fill={colors[0]}
+                fill={colors[0] || '#8884d8'}
                 animationBegin={animationBegin}
                 animationDuration={animationDuration}
               />
@@ -358,7 +358,7 @@ export function Chart({
           <ResponsiveContainer width="100%" height={height}>
             <ComposedChart {...commonProps}>
               {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />}
-              <XAxis dataKey={xKey} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis dataKey={xKey || 'name'} stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
               {tooltipComponent}
               {showLegend && <Legend />}
@@ -369,7 +369,7 @@ export function Chart({
                     <Bar
                       key={key}
                       dataKey={key}
-                      fill={colors[index % colors.length]}
+                      fill={colors[index % colors.length] || '#8884d8'}
                       radius={[2, 2, 0, 0]}
                       animationBegin={animationBegin}
                       animationDuration={animationDuration}

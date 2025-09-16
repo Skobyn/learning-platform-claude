@@ -1,0 +1,76 @@
+# Rate Limiting Configuration for Learning Platform
+# This configuration implements multiple layers of rate limiting
+
+api:
+  global:
+    # Global rate limit for all API endpoints
+    requests_per_minute: 100
+    requests_per_hour: 1000
+    burst_capacity: 150
+  
+  authentication:
+    # Login attempts
+    login:
+      requests_per_minute: 5
+      requests_per_hour: 20
+      lockout_duration: 15 # minutes
+      max_failed_attempts: 5
+    
+    # Password reset requests
+    password_reset:
+      requests_per_minute: 2
+      requests_per_hour: 5
+      requests_per_day: 10
+  
+  user_endpoints:
+    # User registration
+    registration:
+      requests_per_minute: 3
+      requests_per_hour: 10
+      email_verification_required: true
+    
+    # Course access
+    course_access:
+      requests_per_minute: 30
+      concurrent_sessions: 3
+      download_limit_mb_per_hour: 500
+  
+  admin_endpoints:
+    # Admin operations
+    admin:
+      requests_per_minute: 50
+      requests_per_hour: 200
+      require_mfa: true
+  
+  file_upload:
+    # File upload limits
+    max_file_size_mb: 100
+    requests_per_minute: 10
+    requests_per_hour: 50
+    allowed_extensions: ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.png', '.mp4']
+
+# Rate limiting by IP
+ip_based:
+  default:
+    requests_per_minute: 60
+    requests_per_hour: 600
+  
+  # Stricter limits for suspicious behavior
+  suspicious_activity:
+    threshold_violations: 3
+    enhanced_limit_duration: 60 # minutes
+    requests_per_minute: 10
+    requests_per_hour: 50
+
+# Rate limiting implementation strategy
+implementation:
+  storage: "redis" # Use Redis for distributed rate limiting
+  algorithm: "sliding_window_counter"
+  headers:
+    include_rate_limit_headers: true
+    header_prefix: "X-RateLimit"
+  
+  response:
+    status_code: 429
+    message: "Rate limit exceeded. Please try again later."
+    retry_after_header: true

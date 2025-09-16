@@ -13,7 +13,7 @@ export class UserCacheStrategy {
   static async cacheUserProfile(userId: string, profileData: any): Promise<void> {
     const key = CacheKeyGenerator.user(userId, 'profile');
     await cacheService.set(key, profileData, {
-      ...CacheConfigs.userData,
+      ...CacheConfigs.userSession,
       tags: ['user', 'profile', `user:${userId}`],
     });
   }
@@ -24,7 +24,7 @@ export class UserCacheStrategy {
   static async getUserProfile(userId: string, fallbackFn: () => Promise<any>): Promise<any> {
     const key = CacheKeyGenerator.user(userId, 'profile');
     return await cacheService.getOrSet(key, fallbackFn, {
-      ...CacheConfigs.userData,
+      ...CacheConfigs.userSession,
       tags: ['user', 'profile', `user:${userId}`],
     });
   }
@@ -80,7 +80,7 @@ export class CourseCacheStrategy {
   static async cacheCourseMetadata(courseId: string, metadata: any): Promise<void> {
     const key = CacheKeyGenerator.course(courseId, 'metadata');
     await cacheService.set(key, metadata, {
-      ...CacheConfigs.courseContent,
+      ...CacheConfigs.courseData,
       tags: ['course', 'metadata', `course:${courseId}`],
     });
   }
@@ -92,7 +92,7 @@ export class CourseCacheStrategy {
     // Cache all lessons together
     const allLessonsKey = CacheKeyGenerator.course(courseId, 'lessons');
     await cacheService.set(allLessonsKey, lessons, {
-      ...CacheConfigs.courseContent,
+      ...CacheConfigs.courseData,
       tags: ['course', 'lessons', `course:${courseId}`],
     });
 

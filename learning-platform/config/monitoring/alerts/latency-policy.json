@@ -1,0 +1,36 @@
+{
+  "displayName": "Learning Platform - High Latency Alert",
+  "documentation": {
+    "content": "This alert triggers when the 95th percentile response latency exceeds 2 seconds.\n\nResponse Actions:\n1. Check database query performance\n2. Review slow endpoints in Application Performance Monitoring\n3. Check for resource constraints (CPU/Memory)\n4. Verify external API dependencies\n5. Consider horizontal scaling\n\nEscalation: If latency exceeds 5 seconds, escalate to senior engineer.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "95th percentile latency above 2 seconds",
+      "conditionThreshold": {
+        "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_latencies\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_DELTA",
+            "crossSeriesReducer": "REDUCE_PERCENTILE_95"
+          }
+        ],
+        "comparison": "COMPARISON_GREATER_THAN",
+        "thresholdValue": 2000.0,
+        "duration": "300s",
+        "evaluationMissingData": "EVALUATION_MISSING_DATA_INACTIVE"
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [
+    "NOTIFICATION_CHANNEL_EMAIL",
+    "NOTIFICATION_CHANNEL_SLACK"
+  ],
+  "severity": "WARNING"
+}

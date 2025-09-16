@@ -11,7 +11,7 @@ const createPrismaClient = () => {
     errorFormat: 'pretty',
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: process.env.DATABASE_URL!,
       },
     },
   });
@@ -64,10 +64,10 @@ export const checkDBHealth = async () => {
 export const withTransaction = async <T>(
   callback: (tx: PrismaClient) => Promise<T>
 ): Promise<T> => {
-  return db.$transaction(callback, {
+  return db.$transaction(callback as any, {
     maxWait: 5000, // 5 seconds
     timeout: 10000, // 10 seconds
-  });
+  }) as Promise<T>;
 };
 
 // Batch operations helper

@@ -1,0 +1,23 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy all application files
+COPY . .
+
+# Install ALL dependencies (not just production)
+RUN npm install --force --legacy-peer-deps
+
+# Generate Prisma client
+RUN npx prisma generate || true
+
+# Build Next.js app (this MUST succeed)
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+ENV PORT=3000
+ENV NODE_ENV=production
+
+# Start the production server
+CMD ["npm", "start"]

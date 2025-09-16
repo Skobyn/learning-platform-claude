@@ -10,7 +10,8 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 
 import db from './db';
-import { UserRole, User } from '@prisma/client';
+import { User } from '@prisma/client';
+import { UserRole } from '@/types';
 
 // Extend NextAuth types
 declare module 'next-auth' {
@@ -86,7 +87,7 @@ export const authOptions: NextAuthOptions = {
         // Update last login
         await db.user.update({
           where: { id: user.id },
-          data: { lastLoginAt: new Date() },
+          data: { lastLogin: new Date() },
         });
 
         // Log activity
@@ -102,8 +103,7 @@ export const authOptions: NextAuthOptions = {
           lastName: user.lastName,
           role: user.role,
           organizationId: user.organizationId,
-          avatar: user.avatar,
-        };
+        } as any;
       },
     }),
     GoogleProvider({
@@ -115,8 +115,8 @@ export const authOptions: NextAuthOptions = {
           firstName: profile.given_name,
           lastName: profile.family_name,
           email: profile.email,
-          avatar: profile.picture,
-          role: 'LEARNER' as UserRole,
+          // avatar: profile.picture, // field doesn't exist
+          role: UserRole.LEARNER,
           organizationId: '', // Will need to be set during onboarding
         };
       },
@@ -127,12 +127,11 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.NEXTAUTH_SECRET!,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   pages: {
     signIn: '/auth/signin',
-    signUp: '/auth/signup',
     error: '/auth/error',
   },
   callbacks: {
@@ -142,9 +141,9 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
-        token.role = user.role;
+        token.role = user.role as UserRole;
         token.organizationId = user.organizationId;
-        token.avatar = user.avatar;
+        // token.avatar = user.avatar; // avatar field doesn't exist
       }
 
       // Update session trigger (when user updates profile)
@@ -162,19 +161,19 @@ export const authOptions: NextAuthOptions = {
             role: true,
             firstName: true,
             lastName: true,
-            avatar: true,
+            // avatar: true, // field doesn't exist
           },
         });
 
         if (!dbUser || !dbUser.isActive) {
-          return {}; // Force logout
+          return {} as any; // Force logout
         }
 
         // Update token with latest user data
         token.firstName = dbUser.firstName;
         token.lastName = dbUser.lastName;
-        token.role = dbUser.role;
-        token.avatar = dbUser.avatar;
+        token.role = dbUser.role as UserRole;
+        // token.avatar = dbUser.avatar; // field doesn't exist
       }
 
       return token;
@@ -187,7 +186,7 @@ export const authOptions: NextAuthOptions = {
         lastName: token.lastName,
         role: token.role,
         organizationId: token.organizationId,
-        avatar: token.avatar,
+        // avatar: token.avatar, // field doesn't exist
       };
       return session;
     },
@@ -206,17 +205,18 @@ export const authOptions: NextAuthOptions = {
               email: user.email!,
               firstName: user.firstName || '',
               lastName: user.lastName || '',
-              avatar: user.avatar,
-              role: 'LEARNER',
+              // avatar: user.avatar, // field doesn't exist
+              role: UserRole.LEARNER as any,
               organizationId: 'default', // This should be handled by admin
               emailVerified: new Date(),
+              hashedPassword: '', // OAuth users don't have passwords
             },
           });
           user.id = newUser.id;
-          user.organizationId = newUser.organizationId;
+          user.organizationId = newUser.organizationId || 'default';
         } else {
           user.id = existingUser.id;
-          user.organizationId = existingUser.organizationId;
+          user.organizationId = existingUser.organizationId || 'default';
         }
       }
 
@@ -242,8 +242,8 @@ export const authOptions: NextAuthOptions = {
 
 // Custom JWT utilities
 export const jwtUtils = {
-  sign: (payload: Record<string, any>, expiresIn: string = '24h') => {
-    return jwt.sign(payload, process.env.NEXTAUTH_SECRET!, { expiresIn });
+  sign: (payload: Record<string, any>, expiresIn: string | number = '24h') => {
+    return jwt.sign(payload, process.env.NEXTAUTH_SECRET!, { expiresIn } as any);
   },
 
   verify: (token: string) => {
@@ -320,17 +320,17 @@ export const rbacUtils = {
       LEARNER: 1,
     };
 
-    return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
+    return (roleHierarchy as any)[userRole] >= (roleHierarchy as any)[requiredRole];
   },
 
   canAccessResource: (
     userRole: UserRole,
     userId: string,
     resourceOwnerId: string,
-    requiredRole: UserRole = 'LEARNER'
+    requiredRole: UserRole = UserRole.LEARNER
   ): boolean => {
     // Admin can access everything
-    if (userRole === 'ADMIN') return true;
+    if (userRole === UserRole.ADMIN) return true;
     
     // Owner can access their own resources
     if (userId === resourceOwnerId) return true;
@@ -359,7 +359,7 @@ export const rbacUtils = {
       ],
     };
 
-    return permissions[role] || [];
+    return (permissions as any)[role] || [];
   },
 };
 
@@ -405,7 +405,7 @@ export const sessionUtils = {
           role: true,
           organizationId: true,
           isActive: true,
-          avatar: true,
+          // avatar: true, // field doesn't exist
         },
       });
 

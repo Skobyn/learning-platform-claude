@@ -1,0 +1,86 @@
+{
+  "memory_utilization": {
+    "displayName": "Learning Platform - High Memory Utilization",
+    "documentation": {
+      "content": "This alert triggers when memory utilization exceeds 85% for more than 5 minutes.\n\nResponse Actions:\n1. Check for memory leaks in application logs\n2. Review recent deployments for memory-intensive changes\n3. Analyze database connection pooling\n4. Consider vertical scaling of Cloud Run instances\n5. Review caching mechanisms\n\nEscalation: If memory exceeds 95%, consider immediate scaling.",
+      "mimeType": "text/markdown"
+    },
+    "conditions": [
+      {
+        "displayName": "Memory utilization above 85%",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/container/memory/utilizations\"",
+          "aggregations": [
+            {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_MEAN",
+              "crossSeriesReducer": "REDUCE_MEAN"
+            }
+          ],
+          "comparison": "COMPARISON_GREATER_THAN",
+          "thresholdValue": 0.85,
+          "duration": "300s"
+        }
+      }
+    ],
+    "combiner": "OR",
+    "enabled": true,
+    "severity": "WARNING"
+  },
+  "cpu_utilization": {
+    "displayName": "Learning Platform - High CPU Utilization",
+    "documentation": {
+      "content": "This alert triggers when CPU utilization exceeds 80% for more than 5 minutes.\n\nResponse Actions:\n1. Check for CPU-intensive operations in logs\n2. Review database query performance\n3. Analyze request patterns for unusual load\n4. Consider horizontal scaling\n5. Check for inefficient algorithms or loops\n\nEscalation: If CPU exceeds 95%, enable auto-scaling immediately.",
+      "mimeType": "text/markdown"
+    },
+    "conditions": [
+      {
+        "displayName": "CPU utilization above 80%",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/container/cpu/utilizations\"",
+          "aggregations": [
+            {
+              "alignmentPeriod": "300s",
+              "perSeriesAligner": "ALIGN_MEAN",
+              "crossSeriesReducer": "REDUCE_MEAN"
+            }
+          ],
+          "comparison": "COMPARISON_GREATER_THAN",
+          "thresholdValue": 0.80,
+          "duration": "300s"
+        }
+      }
+    ],
+    "combiner": "OR",
+    "enabled": true,
+    "severity": "WARNING"
+  },
+  "instance_count": {
+    "displayName": "Learning Platform - High Instance Count",
+    "documentation": {
+      "content": "This alert triggers when the number of active instances exceeds the expected threshold.\n\nResponse Actions:\n1. Check for traffic spikes or DDoS attacks\n2. Review auto-scaling configuration\n3. Analyze request patterns\n4. Check for stuck processes causing scaling\n5. Verify cost implications\n\nEscalation: If instances exceed cost thresholds, review scaling policies.",
+      "mimeType": "text/markdown"
+    },
+    "conditions": [
+      {
+        "displayName": "Instance count above 10",
+        "conditionThreshold": {
+          "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/container/instance_count\"",
+          "aggregations": [
+            {
+              "alignmentPeriod": "60s",
+              "perSeriesAligner": "ALIGN_MEAN",
+              "crossSeriesReducer": "REDUCE_MAX"
+            }
+          ],
+          "comparison": "COMPARISON_GREATER_THAN",
+          "thresholdValue": 10.0,
+          "duration": "300s"
+        }
+      }
+    ],
+    "combiner": "OR",
+    "enabled": true,
+    "severity": "INFO"
+  }
+}

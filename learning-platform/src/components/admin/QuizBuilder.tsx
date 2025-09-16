@@ -269,7 +269,9 @@ export function QuizBuilder() {
       (direction === 'down' && index < questions.length - 1)
     ) {
       const newIndex = direction === 'up' ? index - 1 : index + 1;
-      [questions[index], questions[newIndex]] = [questions[newIndex], questions[index]];
+      const temp = questions[index];
+      questions[index] = questions[newIndex]!;
+      questions[newIndex] = temp!;
       
       // Update order numbers
       questions.forEach((q, i) => {
@@ -309,7 +311,7 @@ export function QuizBuilder() {
             correctAnswer: `Correct answer about ${aiPrompt.topic}`,
             explanation: aiPrompt.includeExplanations 
               ? `This is correct because it demonstrates key ${aiPrompt.topic} concepts.`
-              : undefined,
+              : '',
             points: 10,
             order: i + 1
           };
@@ -323,7 +325,7 @@ export function QuizBuilder() {
             correctAnswer: 'True',
             explanation: aiPrompt.includeExplanations 
               ? `This statement is true based on ${aiPrompt.topic} principles.`
-              : undefined,
+              : '',
             points: 5,
             order: i + 1
           };
@@ -331,12 +333,12 @@ export function QuizBuilder() {
           question = {
             id: `ai-q-${i + 1}`,
             quizId: selectedQuiz?.id || 'new',
-            type: questionType,
+            type: questionType || QuestionType.SHORT_ANSWER,
             question: `Explain a key concept related to ${aiPrompt.topic}.`,
             correctAnswer: `Sample answer about ${aiPrompt.topic}`,
             explanation: aiPrompt.includeExplanations 
               ? `Look for explanations covering these key points about ${aiPrompt.topic}.`
-              : undefined,
+              : '',
             points: 15,
             order: i + 1
           };
@@ -391,9 +393,9 @@ export function QuizBuilder() {
       question: questionForm.question,
       options: questionForm.type === QuestionType.MULTIPLE_CHOICE || questionForm.type === QuestionType.TRUE_FALSE 
         ? questionForm.options.filter(opt => opt.trim() !== '')
-        : undefined,
+        : [],
       correctAnswer: questionForm.correctAnswer,
-      explanation: questionForm.explanation || undefined,
+      explanation: questionForm.explanation || '',
       points: questionForm.points,
       order: editingQuestion?.order || selectedQuiz.questions.length + 1
     };

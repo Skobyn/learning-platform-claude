@@ -1,0 +1,128 @@
+{
+  "imageOptimization": {
+    "enabled": true,
+    "formats": {
+      "primary": ["webp", "avif"],
+      "fallback": ["jpeg", "png"],
+      "vector": ["svg"]
+    },
+    "quality": {
+      "default": 85,
+      "thumbnail": 75,
+      "hero": 90,
+      "profile": 80
+    },
+    "sizes": {
+      "thumbnail": [150, 150],
+      "small": [300, 200],
+      "medium": [600, 400],
+      "large": [1200, 800],
+      "hero": [1920, 1080],
+      "profile": [400, 400]
+    },
+    "responsive": {
+      "breakpoints": [640, 768, 1024, 1280, 1536],
+      "densities": [1, 2],
+      "generateSrcSet": true
+    },
+    "cdn": {
+      "provider": "cloudinary",
+      "baseUrl": "https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}",
+      "transformations": {
+        "auto": "f_auto,q_auto",
+        "thumbnail": "c_thumb,g_face,w_150,h_150",
+        "hero": "c_fill,w_1920,h_1080,q_90",
+        "profile": "c_fill,w_400,h_400,g_face,r_max",
+        "course_card": "c_fill,w_300,h_200,q_85"
+      },
+      "caching": {
+        "maxAge": "31536000",
+        "staleWhileRevalidate": "2592000"
+      }
+    },
+    "compression": {
+      "jpeg": {
+        "quality": 85,
+        "progressive": true,
+        "mozjpeg": true
+      },
+      "png": {
+        "compressionLevel": 9,
+        "adaptiveFiltering": true,
+        "palette": true
+      },
+      "webp": {
+        "quality": 85,
+        "lossless": false,
+        "method": 6
+      },
+      "avif": {
+        "quality": 75,
+        "speed": 8,
+        "chromaSubsampling": "4:2:0"
+      }
+    },
+    "lazyLoading": {
+      "enabled": true,
+      "threshold": "100px",
+      "placeholder": "blur",
+      "blurDataURL": true
+    },
+    "validation": {
+      "maxFileSize": "10MB",
+      "allowedTypes": ["image/jpeg", "image/png", "image/webp", "image/avif", "image/svg+xml"],
+      "minDimensions": [50, 50],
+      "maxDimensions": [5000, 5000]
+    }
+  },
+  "implementation": {
+    "nextjs": {
+      "imageComponent": true,
+      "domains": [
+        "res.cloudinary.com",
+        "images.unsplash.com",
+        "picsum.photos",
+        "learning-platform-assets.s3.amazonaws.com"
+      ],
+      "deviceSizes": [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+      "imageSizes": [16, 32, 48, 64, 96, 128, 256, 384],
+      "formats": ["image/webp", "image/avif"]
+    },
+    "processing": {
+      "uploadTime": true,
+      "requestTime": false,
+      "batch": true,
+      "queue": "redis"
+    }
+  },
+  "monitoring": {
+    "metrics": {
+      "compressionRatio": true,
+      "loadTime": true,
+      "cacheHitRate": true,
+      "bandwidthSavings": true
+    },
+    "alerts": {
+      "imageTooBig": "5MB",
+      "slowProcessing": "5s",
+      "lowCacheHit": "80%"
+    }
+  },
+  "guidelines": {
+    "bestPractices": [
+      "Use WebP/AVIF for modern browsers with JPEG/PNG fallback",
+      "Implement responsive images with appropriate srcset",
+      "Compress images at upload time, not request time",
+      "Use CDN with global edge locations",
+      "Implement lazy loading for below-fold images",
+      "Generate blur placeholders for smooth loading",
+      "Optimize alt text for accessibility",
+      "Use appropriate image sizes for context"
+    ],
+    "performance": {
+      "expectedSavings": "60-80% file size reduction",
+      "loadTimeImprovement": "40-60% faster loading",
+      "bandwidthReduction": "50-70% less data transfer"
+    }
+  }
+}

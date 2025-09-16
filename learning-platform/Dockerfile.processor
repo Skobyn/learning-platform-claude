@@ -1,0 +1,73 @@
+# Video processor worker Dockerfile
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Create working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy application source
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Build TypeScript
+RUN npm run build
+
+# Create temp directory for processing
+RUN mkdir -p /tmp/processing && chmod 777 /tmp/processing
+
+# Create non-root user
+RUN addgroup -g 1001 -S processor && \
+    adduser -S processor -u 1001 -G processor
+
+# Set ownership
+RUN chown -R processor:processor /app /tmp/processing
+
+# Health check script
+COPY <<EOF /app/healthcheck.js
+const Redis = require('ioredis');
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+async function healthCheck() {
+  try {
+    await redis.ping();
+    console.log('Health check passed');
+    process.exit(0);
+  } catch (error) {
+    console.error('Health check failed:', error);
+    process.exit(1);
+  } finally {
+    redis.disconnect();
+  }
+}
+
+healthCheck();
+EOF
+
+# Switch to non-root user
+USER processor
+
+# Environment variables
+ENV NODE_ENV=production
+ENV WORKER_TYPE=video-processor
+
+# Start the processor worker
+CMD ["node", "dist/workers/video-processor.js"]
+
+# Labels for metadata
+LABEL maintainer="Learning Platform Team"
+LABEL version="1.0"
+LABEL description="Video processing worker for queue management"

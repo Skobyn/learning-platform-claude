@@ -23,7 +23,7 @@ class EmailService {
   private templateCache = new Map<string, EmailTemplate>();
 
   constructor() {
-    this.transporter = nodemailer.createTransporter({
+    this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'localhost',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
@@ -74,6 +74,7 @@ class EmailService {
     
     await this.sendEmail({
       to: email,
+      subject: 'Password Reset Request',
       template: 'password-reset',
       templateData: {
         resetUrl,
@@ -90,6 +91,7 @@ class EmailService {
     
     await this.sendEmail({
       to: email,
+      subject: 'Verify Your Email Address',
       template: 'email-verification',
       templateData: {
         firstName,
@@ -105,6 +107,7 @@ class EmailService {
   async sendWelcomeEmail(email: string, firstName: string): Promise<void> {
     await this.sendEmail({
       to: email,
+      subject: 'Welcome to Our Learning Platform',
       template: 'welcome',
       templateData: {
         firstName,
@@ -119,6 +122,7 @@ class EmailService {
   async sendEnrollmentConfirmation(email: string, userName: string, courseTitle: string): Promise<void> {
     await this.sendEmail({
       to: email,
+      subject: 'Course Enrollment Confirmed',
       template: 'enrollment-confirmation',
       templateData: {
         userName,
@@ -134,6 +138,7 @@ class EmailService {
   async sendCertificateEmail(email: string, userName: string, courseTitle: string, certificateUrl: string): Promise<void> {
     await this.sendEmail({
       to: email,
+      subject: 'Your Course Certificate',
       template: 'certificate',
       templateData: {
         userName,
@@ -149,6 +154,7 @@ class EmailService {
   async sendAssessmentReminder(email: string, userName: string, assessmentTitle: string, dueDate: Date): Promise<void> {
     await this.sendEmail({
       to: email,
+      subject: 'Assessment Reminder',
       template: 'assessment-reminder',
       templateData: {
         userName,

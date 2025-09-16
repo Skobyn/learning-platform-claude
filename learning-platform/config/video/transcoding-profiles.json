@@ -1,0 +1,269 @@
+{
+  "profiles": [
+    {
+      "name": "240p",
+      "resolution": "426x240",
+      "bitrate": "400k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "medium",
+      "audioCodec": "aac",
+      "audioBitrate": "64k",
+      "description": "Mobile-optimized quality for low bandwidth",
+      "targetDevices": ["mobile", "low-bandwidth"],
+      "maxBitrate": "500k",
+      "bufferSize": "800k"
+    },
+    {
+      "name": "360p",
+      "resolution": "640x360",
+      "bitrate": "800k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "medium",
+      "audioCodec": "aac",
+      "audioBitrate": "96k",
+      "description": "Standard mobile quality",
+      "targetDevices": ["mobile", "tablet"],
+      "maxBitrate": "1000k",
+      "bufferSize": "1600k"
+    },
+    {
+      "name": "480p",
+      "resolution": "854x480",
+      "bitrate": "1200k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "medium",
+      "audioCodec": "aac",
+      "audioBitrate": "128k",
+      "description": "Standard definition quality",
+      "targetDevices": ["tablet", "desktop"],
+      "maxBitrate": "1500k",
+      "bufferSize": "2400k"
+    },
+    {
+      "name": "720p",
+      "resolution": "1280x720",
+      "bitrate": "2500k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "medium",
+      "audioCodec": "aac",
+      "audioBitrate": "128k",
+      "description": "HD quality for desktop and smart TVs",
+      "targetDevices": ["desktop", "smart-tv"],
+      "maxBitrate": "3000k",
+      "bufferSize": "5000k"
+    },
+    {
+      "name": "1080p",
+      "resolution": "1920x1080",
+      "bitrate": "5000k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "medium",
+      "audioCodec": "aac",
+      "audioBitrate": "192k",
+      "description": "Full HD quality for premium experience",
+      "targetDevices": ["desktop", "smart-tv", "casting"],
+      "maxBitrate": "6000k",
+      "bufferSize": "10000k"
+    }
+  ],
+  "hlsSettings": {
+    "segmentDuration": 6,
+    "playlistType": "vod",
+    "segmentFilename": "segment_%03d.ts",
+    "keyframeInterval": 60,
+    "flags": ["independent_segments"]
+  },
+  "dashSettings": {
+    "segmentDuration": 4,
+    "windowSize": 5,
+    "extraWindowSize": 5,
+    "minBufferTime": "PT4S",
+    "adaptation": {
+      "maxWidth": 1920,
+      "maxHeight": 1080,
+      "maxFrameRate": 30,
+      "par": "1:1"
+    }
+  },
+  "thumbnailSettings": {
+    "count": 20,
+    "width": 160,
+    "height": 90,
+    "format": "jpg",
+    "quality": 85,
+    "spritesheet": {
+      "columns": 5,
+      "rows": 4,
+      "enabled": true
+    }
+  },
+  "subtitleSettings": {
+    "formats": ["webvtt", "srt"],
+    "languages": ["en", "es", "fr", "de", "pt", "it", "ja", "ko", "zh"],
+    "extractAll": true,
+    "autoDetect": true
+  },
+  "advancedSettings": {
+    "twoPass": false,
+    "lookahead": 25,
+    "bFrames": 3,
+    "refFrames": 3,
+    "mixedRefs": true,
+    "fastPskip": true,
+    "dctDecimate": true,
+    "cabac": true,
+    "deblock": "0:0",
+    "adaptiveQuantization": 1,
+    "psychoRd": 1.0,
+    "psychoTrellis": 0.0
+  },
+  "hardwareAcceleration": {
+    "nvidia": {
+      "enabled": true,
+      "codec": "h264_nvenc",
+      "preset": "medium",
+      "profile": "high",
+      "level": "4.0",
+      "rcMode": "vbr",
+      "cq": 23,
+      "gpu": 0
+    },
+    "intel": {
+      "enabled": true,
+      "codec": "h264_qsv",
+      "preset": "medium",
+      "profile": "high",
+      "level": "4.0",
+      "lookAhead": true,
+      "lookAheadDepth": 40
+    },
+    "amd": {
+      "enabled": true,
+      "codec": "h264_amf",
+      "preset": "balanced",
+      "profile": "high",
+      "level": "4.0",
+      "rcMode": "vbr",
+      "quality": "balanced"
+    }
+  },
+  "audioProfiles": {
+    "low": {
+      "codec": "aac",
+      "bitrate": "64k",
+      "sampleRate": 44100,
+      "channels": 2,
+      "profile": "aac_low"
+    },
+    "standard": {
+      "codec": "aac",
+      "bitrate": "128k",
+      "sampleRate": 48000,
+      "channels": 2,
+      "profile": "aac_low"
+    },
+    "high": {
+      "codec": "aac",
+      "bitrate": "192k",
+      "sampleRate": 48000,
+      "channels": 2,
+      "profile": "aac_low"
+    },
+    "surround": {
+      "codec": "aac",
+      "bitrate": "384k",
+      "sampleRate": 48000,
+      "channels": 6,
+      "profile": "aac_low"
+    }
+  },
+  "watermarkSettings": {
+    "enabled": false,
+    "position": "bottom-right",
+    "opacity": 0.7,
+    "scale": 0.1,
+    "margin": 20
+  },
+  "drmSettings": {
+    "enabled": false,
+    "providers": {
+      "widevine": {
+        "keySystem": "com.widevine.alpha",
+        "licenseUrl": "https://your-license-server.com/widevine"
+      },
+      "playready": {
+        "keySystem": "com.microsoft.playready",
+        "licenseUrl": "https://your-license-server.com/playready"
+      },
+      "fairplay": {
+        "keySystem": "com.apple.fps.1_0",
+        "licenseUrl": "https://your-license-server.com/fairplay",
+        "certificateUrl": "https://your-license-server.com/fairplay/cert"
+      }
+    }
+  },
+  "adaptiveBitrate": {
+    "enabled": true,
+    "switchUpBandwidthFactor": 1.5,
+    "switchDownBandwidthFactor": 0.8,
+    "maxSwitchUpBitrate": "6000k",
+    "minSwitchDownBitrate": "400k",
+    "bufferBasedSwitching": true,
+    "networkBasedSwitching": true,
+    "qualityBasedSwitching": true
+  },
+  "qualityLadder": {
+    "minResolution": "240p",
+    "maxResolution": "1080p",
+    "targetBitrateRatio": [0.5, 0.75, 1.0, 1.5, 2.0],
+    "adaptiveStreaming": true,
+    "deviceBasedSelection": true
+  },
+  "performance": {
+    "concurrentTranscodes": 2,
+    "maxRetries": 3,
+    "retryDelay": 30000,
+    "timeoutMinutes": 60,
+    "cleanupOldFiles": true,
+    "cleanupAfterDays": 30
+  },
+  "storage": {
+    "inputPath": "/storage/videos/input",
+    "outputPath": "/storage/videos/output",
+    "tempPath": "/tmp/video-processing",
+    "thumbnailPath": "/storage/videos/thumbnails",
+    "subtitlePath": "/storage/videos/subtitles",
+    "logPath": "/var/log/video-processing"
+  },
+  "notifications": {
+    "webhook": {
+      "enabled": false,
+      "url": "https://your-app.com/webhooks/video-processing",
+      "events": ["started", "completed", "failed", "progress"]
+    },
+    "email": {
+      "enabled": false,
+      "recipients": ["admin@your-app.com"],
+      "events": ["completed", "failed"]
+    }
+  },
+  "analytics": {
+    "trackingEnabled": true,
+    "metricsCollection": {
+      "transcodingTime": true,
+      "fileSize": true,
+      "qualityMetrics": true,
+      "errorRates": true,
+      "resourceUsage": true
+    },
+    "retention": {
+      "rawLogs": 30,
+      "aggregatedMetrics": 365
+    }
+  }
+}

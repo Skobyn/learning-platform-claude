@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/ioredis": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.3"
+  },
+  "scripts": {
+    "redis:cluster:start": "docker-compose -f docker-compose.redis.yml up -d",
+    "redis:cluster:stop": "docker-compose -f docker-compose.redis.yml down",
+    "redis:cluster:logs": "docker-compose -f docker-compose.redis.yml logs -f",
+    "redis:monitor": "bash scripts/redis-monitor.sh",
+    "redis:health": "redis-cli -h localhost -p 7001 cluster info"
+  }
+}

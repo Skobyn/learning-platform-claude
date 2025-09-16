@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.11.0",
+    "lodash": "^4.17.21",
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.202"
+  },
+  "scripts": {
+    "search:reindex": "ts-node scripts/search/reindex-content.ts reindex",
+    "search:reindex:courses": "ts-node scripts/search/reindex-content.ts reindex --type courses",
+    "search:reindex:lessons": "ts-node scripts/search/reindex-content.ts reindex --type lessons",
+    "search:reindex:resources": "ts-node scripts/search/reindex-content.ts reindex --type resources",
+    "search:reindex:all": "ts-node scripts/search/reindex-content.ts reindex --type all --parallel",
+    "search:status": "ts-node scripts/search/reindex-content.ts status",
+    "search:create-indexes": "ts-node scripts/search/reindex-content.ts create-indexes",
+    "search:dry-run": "ts-node scripts/search/reindex-content.ts reindex --dry-run",
+    "search:force-reindex": "ts-node scripts/search/reindex-content.ts reindex --force"
+  }
+}

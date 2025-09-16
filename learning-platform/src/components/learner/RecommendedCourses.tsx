@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/badge'
 import CourseCard from './CourseCard'
 import { Course, Recommendation, RecommendationType } from '@/types'
 import { Sparkles, TrendingUp, User, BookOpen, ArrowRight } from 'lucide-react'

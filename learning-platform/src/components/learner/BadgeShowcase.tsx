@@ -3,7 +3,7 @@
 import React from 'react'
 import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
+import { Badge } from '@/components/ui/badge'
 import { UserBadge, Badge as BadgeType, BadgeType as BadgeTypeEnum } from '@/types'
 import { Award, Trophy, Star, Target, Zap, Calendar, Medal, Crown } from 'lucide-react'
 
@@ -47,11 +47,11 @@ const getBadgeTier = (badgeName: string): 'bronze' | 'silver' | 'gold' => {
 const getTierBadgeVariant = (tier: 'bronze' | 'silver' | 'gold') => {
   switch (tier) {
     case 'gold':
-      return 'gold'
+      return 'warning'
     case 'silver':
-      return 'silver'
+      return 'secondary'
     case 'bronze':
-      return 'bronze'
+      return 'default'
     default:
       return 'default'
   }

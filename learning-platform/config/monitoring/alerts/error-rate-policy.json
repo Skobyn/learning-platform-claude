@@ -1,0 +1,45 @@
+{
+  "displayName": "Learning Platform - High Error Rate Alert",
+  "documentation": {
+    "content": "This alert triggers when the error rate exceeds 5% over a 5-minute period.\n\nResponse Actions:\n1. Check recent deployments\n2. Review application logs\n3. Verify database connectivity\n4. Check external service dependencies\n5. Scale up instances if needed\n\nEscalation: If error rate exceeds 10%, page on-call engineer immediately.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "Error rate above 5%",
+      "conditionThreshold": {
+        "filter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": ["metric.label.response_code_class"]
+          }
+        ],
+        "comparison": "COMPARISON_GREATER_THAN",
+        "thresholdValue": 0.05,
+        "duration": "300s",
+        "evaluationMissingData": "EVALUATION_MISSING_DATA_INACTIVE",
+        "denominatorFilter": "resource.type=\"cloud_run_revision\" AND metric.type=\"run.googleapis.com/request_count\"",
+        "denominatorAggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ]
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "combiner": "OR",
+  "enabled": true,
+  "notificationChannels": [
+    "NOTIFICATION_CHANNEL_EMAIL",
+    "NOTIFICATION_CHANNEL_SLACK"
+  ],
+  "severity": "ERROR"
+}

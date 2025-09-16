@@ -1,11 +1,11 @@
 // Export all services for easy importing
-export { courseService, CourseService } from './courseService';
-export { assessmentService, AssessmentService } from './assessmentService';
-export { badgeService, BadgeService } from './badgeService';
-export { notificationService, NotificationService } from './notificationService';
-export { analyticsService, AnalyticsService } from './analyticsService';
-export { mediaService, MediaService } from './mediaService';
-export { recommendationService, RecommendationService } from './recommendationService';
+export { courseService } from './courseService';
+export { assessmentService } from './assessmentService';
+// export { badgeService } from './badgeService'; // Temporarily disabled
+export { notificationService } from './notificationService';
+export { analyticsService } from './analyticsService';
+// export { mediaService } from './mediaService'; // Temporarily disabled
+export { recommendationService } from './recommendationService';
 
 // Export utility functions
 export { default as logger } from '../utils/logger';

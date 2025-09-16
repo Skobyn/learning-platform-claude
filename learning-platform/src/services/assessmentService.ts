@@ -13,14 +13,15 @@ export class AssessmentService {
   /**
    * Create a new quiz for a module
    */
-  async createQuiz(moduleId: string, quizData: Omit<Quiz, 'id' | 'moduleId' | 'createdAt' | 'updatedAt' | 'questions'>): Promise<Quiz> {
+  async createQuiz(moduleId: string, createdBy: string, quizData: Omit<Quiz, 'id' | 'moduleId' | 'createdBy' | 'createdAt' | 'updatedAt' | 'questions'>): Promise<Quiz> {
     try {
       logger.info('Creating new quiz', { moduleId, title: quizData.title });
       
       const quiz = await prisma.quiz.create({
         data: {
           ...quizData,
-          moduleId
+          moduleId,
+          createdBy
         },
         include: {
           questions: true
@@ -28,7 +29,7 @@ export class AssessmentService {
       });
 
       logger.info('Quiz created successfully', { quizId: quiz.id });
-      return quiz as Quiz;
+      return quiz as any;
     } catch (error) {
       logger.error('Error creating quiz', { moduleId, error });
       throw new ValidationError('Failed to create quiz');
@@ -44,17 +45,21 @@ export class AssessmentService {
       
       const question = await prisma.question.create({
         data: {
-          ...questionData,
-          quizId,
+          text: questionData.question,
           type: questionData.type as any,
+          options: questionData.options || [],
           correctAnswer: Array.isArray(questionData.correctAnswer) ? 
             questionData.correctAnswer : 
-            [questionData.correctAnswer]
+            [questionData.correctAnswer],
+          explanation: questionData.explanation || '',
+          points: questionData.points,
+          orderIndex: questionData.order,
+          quizId
         }
       });
 
       logger.info('Question added successfully', { questionId: question.id });
-      return question as Question;
+      return question as any;
     } catch (error) {
       logger.error('Error adding question', { quizId, error });
       throw new ValidationError('Failed to add question');
@@ -70,7 +75,7 @@ export class AssessmentService {
         where: { id: quizId },
         include: {
           questions: {
-            orderBy: { order: 'asc' }
+            orderBy: { orderIndex: 'asc' }
           }
         }
       });
@@ -79,7 +84,7 @@ export class AssessmentService {
         throw new NotFoundError('Quiz not found');
       }
 
-      return quiz as Quiz;
+      return quiz as any;
     } catch (error) {
       if (error instanceof NotFoundError) throw error;
       logger.error('Error fetching quiz', { quizId, error });
@@ -99,23 +104,21 @@ export class AssessmentService {
         where: {
           quizId,
           userId,
-          completedAt: null
+          submittedAt: null
         }
       });
 
       if (existingAttempt) {
         logger.info('Resuming existing quiz attempt', { attemptId: existingAttempt.id });
-        return existingAttempt as QuizAttempt;
+        return existingAttempt as any;
       }
 
       const attempt = await prisma.quizAttempt.create({
         data: {
           quizId,
           userId,
-          answers: [],
-          score: 0,
-          passed: false,
-          startedAt: new Date()
+          score: null,
+          passed: false
         },
         include: {
           quiz: {
@@ -127,7 +130,7 @@ export class AssessmentService {
       });
 
       logger.info('Quiz attempt started', { attemptId: attempt.id });
-      return attempt as QuizAttempt;
+      return attempt as any;
     } catch (error) {
       logger.error('Error starting quiz attempt', { quizId, userId, error });
       throw new ValidationError('Failed to start quiz attempt');
@@ -156,7 +159,7 @@ export class AssessmentService {
         throw new NotFoundError('Quiz attempt not found');
       }
 
-      if (attempt.completedAt) {
+      if (attempt.submittedAt) {
         throw new ValidationError('Quiz attempt already completed');
       }
 
@@ -166,7 +169,7 @@ export class AssessmentService {
       }
 
       // Evaluate answer
-      const isCorrect = this.evaluateAnswer(question, answer);
+      const isCorrect = this.evaluateAnswer(question as any, answer);
       const pointsEarned = isCorrect ? question.points : 0;
 
       const quizAnswer: QuizAnswer = {
@@ -176,20 +179,36 @@ export class AssessmentService {
         pointsEarned
       };
 
-      // Update attempt with new answer
-      const updatedAnswers = [...(attempt.answers as QuizAnswer[])];
-      const existingIndex = updatedAnswers.findIndex(a => a.questionId === questionId);
-      
-      if (existingIndex >= 0) {
-        updatedAnswers[existingIndex] = quizAnswer;
-      } else {
-        updatedAnswers.push(quizAnswer);
-      }
-
-      await prisma.quizAttempt.update({
-        where: { id: attemptId },
-        data: { answers: updatedAnswers }
+      // Check if response already exists
+      const existingResponse = await prisma.questionResponse.findFirst({
+        where: {
+          attemptId,
+          questionId
+        }
       });
+
+      if (existingResponse) {
+        // Update existing response
+        await prisma.questionResponse.update({
+          where: { id: existingResponse.id },
+          data: {
+            answer,
+            isCorrect,
+            pointsEarned
+          }
+        });
+      } else {
+        // Create new response
+        await prisma.questionResponse.create({
+          data: {
+            attemptId,
+            questionId,
+            answer,
+            isCorrect,
+            pointsEarned
+          }
+        });
+      }
 
       logger.info('Answer submitted successfully', { attemptId, questionId, isCorrect });
       return quizAnswer;
@@ -222,13 +241,17 @@ export class AssessmentService {
         throw new NotFoundError('Quiz attempt not found');
       }
 
-      if (attempt.completedAt) {
+      if (attempt.submittedAt) {
         throw new ValidationError('Quiz attempt already completed');
       }
 
-      const answers = attempt.answers as QuizAnswer[];
+      // Fetch all responses for this attempt
+      const responses = await prisma.questionResponse.findMany({
+        where: { attemptId }
+      });
+      
       const totalPoints = attempt.quiz.questions.reduce((sum, q) => sum + q.points, 0);
-      const earnedPoints = answers.reduce((sum, a) => sum + a.pointsEarned, 0);
+      const earnedPoints = responses.reduce((sum, r) => sum + r.pointsEarned, 0);
       
       const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
       const passed = score >= attempt.quiz.passingScore;
@@ -238,7 +261,6 @@ export class AssessmentService {
         data: {
           score,
           passed,
-          completedAt: new Date(),
           submittedAt: new Date()
         },
         include: {
@@ -251,7 +273,7 @@ export class AssessmentService {
       });
 
       logger.info('Quiz attempt completed', { attemptId, score, passed });
-      return completedAttempt as QuizAttempt;
+      return completedAttempt as any;
     } catch (error) {
       if (error instanceof NotFoundError || error instanceof ValidationError) throw error;
       logger.error('Error completing quiz attempt', { attemptId, error });
@@ -279,7 +301,7 @@ export class AssessmentService {
         orderBy: { startedAt: 'desc' }
       });
 
-      return attempts as QuizAttempt[];
+      return attempts as any;
     } catch (error) {
       logger.error('Error fetching user quiz attempts', { userId, quizId, error });
       throw new ValidationError('Failed to fetch quiz attempts');
@@ -327,7 +349,7 @@ export class AssessmentService {
         response_format: { type: "json_object" }
       });
 
-      const response = JSON.parse(completion.choices[0].message.content || '{"questions": []}');
+      const response = JSON.parse(completion.choices[0]?.message?.content || '{"questions": []}');
       const questions = response.questions || [];
       
       // Format questions to match our schema
@@ -366,22 +388,27 @@ export class AssessmentService {
       const attempts = await prisma.quizAttempt.findMany({
         where: { 
           quizId,
-          completedAt: { not: null }
+          submittedAt: { not: null }
         }
       });
 
       const totalAttempts = attempts.length;
       const averageScore = totalAttempts > 0 ? 
-        attempts.reduce((sum, a) => sum + a.score, 0) / totalAttempts : 0;
+        attempts.reduce((sum, a) => sum + (a.score || 0), 0) / totalAttempts : 0;
       const passedAttempts = attempts.filter(a => a.passed).length;
       const passRate = totalAttempts > 0 ? (passedAttempts / totalAttempts) * 100 : 0;
 
       // Analyze individual questions
       const quiz = await this.getQuizById(quizId);
+      
+      // Fetch all responses for these attempts
+      const attemptIds = attempts.map(a => a.id);
+      const allResponses = await prisma.questionResponse.findMany({
+        where: { attemptId: { in: attemptIds } }
+      });
+      
       const questionAnalytics = quiz.questions.map(question => {
-        const questionAnswers = attempts.flatMap(attempt => 
-          (attempt.answers as QuizAnswer[]).filter(answer => answer.questionId === question.id)
-        );
+        const questionAnswers = allResponses.filter(response => response.questionId === question.id);
         
         const correctAnswers = questionAnswers.filter(answer => answer.isCorrect).length;
         const correctRate = questionAnswers.length > 0 ? 
@@ -420,7 +447,7 @@ export class AssessmentService {
     } else {
       // For single answer questions
       if (question.type === QuestionType.TRUE_FALSE) {
-        return userAnswer.toLowerCase() === correctAnswers[0].toLowerCase();
+        return !!(correctAnswers[0] && userAnswer.toLowerCase() === correctAnswers[0].toLowerCase());
       }
       return correctAnswers.includes(userAnswer);
     }
@@ -433,10 +460,12 @@ export class AssessmentService {
     try {
       logger.info('Updating quiz', { quizId });
       
+      const { id, moduleId, createdAt, questions, ...allowedUpdates } = updates;
+      
       const quiz = await prisma.quiz.update({
         where: { id: quizId },
         data: {
-          ...updates,
+          ...allowedUpdates,
           updatedAt: new Date()
         },
         include: {
@@ -445,7 +474,7 @@ export class AssessmentService {
       });
 
       logger.info('Quiz updated successfully', { quizId });
-      return quiz as Quiz;
+      return quiz as any;
     } catch (error) {
       logger.error('Error updating quiz', { quizId, error });
       throw new ValidationError('Failed to update quiz');

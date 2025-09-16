@@ -1,0 +1,76 @@
+{
+  "email_channels": [
+    {
+      "displayName": "Learning Platform - Operations Team",
+      "type": "email",
+      "labels": {
+        "email_address": "ops@learningplatform.com"
+      },
+      "userLabels": {
+        "team": "operations",
+        "severity": "all"
+      },
+      "enabled": true,
+      "description": "Primary notification channel for all operational alerts"
+    },
+    {
+      "displayName": "Learning Platform - Critical Alerts",
+      "type": "email",
+      "labels": {
+        "email_address": "critical-alerts@learningplatform.com"
+      },
+      "userLabels": {
+        "team": "oncall",
+        "severity": "critical"
+      },
+      "enabled": true,
+      "description": "High-priority alerts requiring immediate attention"
+    }
+  ],
+  "slack_channels": [
+    {
+      "displayName": "Learning Platform - Slack Alerts",
+      "type": "slack",
+      "labels": {
+        "channel_name": "#learning-platform-alerts",
+        "team_domain": "your-workspace"
+      },
+      "userLabels": {
+        "team": "engineering",
+        "environment": "production"
+      },
+      "enabled": true,
+      "description": "Real-time alerts to engineering team Slack channel"
+    }
+  ],
+  "pagerduty_channels": [
+    {
+      "displayName": "Learning Platform - PagerDuty Critical",
+      "type": "pagerduty",
+      "labels": {
+        "service_key": "PAGERDUTY_SERVICE_KEY_PLACEHOLDER"
+      },
+      "userLabels": {
+        "team": "oncall",
+        "severity": "critical"
+      },
+      "enabled": true,
+      "description": "Critical alerts that require immediate on-call response"
+    }
+  ],
+  "webhook_channels": [
+    {
+      "displayName": "Learning Platform - Custom Webhook",
+      "type": "webhook_tokenauth",
+      "labels": {
+        "url": "https://your-webhook-endpoint.com/alerts"
+      },
+      "userLabels": {
+        "integration": "custom",
+        "format": "json"
+      },
+      "enabled": false,
+      "description": "Custom webhook integration for external systems"
+    }
+  ]
+}

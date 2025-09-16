@@ -1,0 +1,445 @@
+# Auto-scaling Configuration for Learning Platform
+# Horizontal Pod Autoscaler and Vertical Pod Autoscaler configurations
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: learning-platform-hpa
+  namespace: learning-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: learning-platform
+  minReplicas: 2
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: custom.googleapis.com|app|request_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+      - type: Percent
+        value: 50  # Scale down max 50% of current replicas
+        periodSeconds: 60
+      - type: Pods
+        value: 2   # Scale down max 2 pods
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60   # 1 minute
+      policies:
+      - type: Percent
+        value: 100  # Scale up max 100% of current replicas
+        periodSeconds: 30
+      - type: Pods
+        value: 4    # Scale up max 4 pods
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Vertical Pod Autoscaler
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: learning-platform-vpa
+  namespace: learning-platform
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: learning-platform
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: learning-platform
+      minAllowed:
+        cpu: 250m
+        memory: 512Mi
+      maxAllowed:
+        cpu: 2000m
+        memory: 4Gi
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: learning-platform-pdb
+  namespace: learning-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: learning-platform
+
+---
+# Cloud Run Service Configuration with Auto-scaling
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: learning-platform
+  namespace: learning-platform
+  annotations:
+    # Auto-scaling annotations
+    autoscaling.knative.dev/minScale: "2"
+    autoscaling.knative.dev/maxScale: "100"
+    autoscaling.knative.dev/target: "80"  # Target concurrent requests per instance
+    
+    # Performance optimizations
+    run.googleapis.com/cpu-throttling: "false"
+    run.googleapis.com/execution-environment: gen2
+    
+    # Network and security
+    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress-status: all
+    
+    # Traffic allocation
+    serving.knative.dev/creator: learning-platform-system
+    serving.knative.dev/lastModifier: learning-platform-system
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scaling configuration
+        autoscaling.knative.dev/minScale: "2"
+        autoscaling.knative.dev/maxScale: "100"
+        autoscaling.knative.dev/target: "80"
+        autoscaling.knative.dev/targetUtilization: "70"
+        
+        # Container configuration
+        run.googleapis.com/memory: "2Gi"
+        run.googleapis.com/cpu: "2"
+        run.googleapis.com/startup-probe-period: "60"
+        run.googleapis.com/startup-probe-timeout: "10"
+        
+        # Cloud SQL connection
+        run.googleapis.com/cloudsql-instances: PROJECT_ID:REGION:learning-platform-db
+        
+        # VPC connector for private resources
+        run.googleapis.com/vpc-access-connector: learning-platform-connector
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      containerConcurrency: 1000
+      timeoutSeconds: 300
+      serviceAccountName: learning-platform-sa
+      containers:
+      - image: gcr.io/PROJECT_ID/learning-platform:latest
+        ports:
+        - name: http1
+          containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: PORT
+          value: "3000"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 30
+
+---
+# Database Connection Pool Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-pool-config
+  namespace: learning-platform
+data:
+  pool-config.json: |
+    {
+      "connectionPooling": {
+        "enabled": true,
+        "maxConnections": 20,
+        "minConnections": 5,
+        "acquireTimeoutMs": 60000,
+        "createTimeoutMs": 30000,
+        "destroyTimeoutMs": 5000,
+        "idleTimeoutMs": 30000,
+        "reapIntervalMs": 1000,
+        "createRetryIntervalMs": 200
+      },
+      "readReplicas": {
+        "enabled": true,
+        "urls": [
+          "postgresql://user:pass@read-replica-1:5432/learning_platform",
+          "postgresql://user:pass@read-replica-2:5432/learning_platform"
+        ],
+        "loadBalancing": "round-robin"
+      }
+    }
+
+---
+# Redis Scaling Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-cluster
+  namespace: learning-platform
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: redis-cluster
+  template:
+    metadata:
+      labels:
+        app: redis-cluster
+    spec:
+      containers:
+      - name: redis
+        image: redis:6-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        args:
+        - redis-server
+        - --cluster-enabled
+        - "yes"
+        - --cluster-config-file
+        - nodes.conf
+        - --cluster-node-timeout
+        - "5000"
+        - --appendonly
+        - "yes"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-data-pvc
+
+---
+# Load Balancer Configuration
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: learning-platform-ssl
+  namespace: learning-platform
+spec:
+  domains:
+    - learning-platform.example.com
+    - www.learning-platform.example.com
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: learning-platform-ingress
+  namespace: learning-platform
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: learning-platform-ip
+    networking.gke.io/managed-certificates: learning-platform-ssl
+    kubernetes.io/ingress.class: "gce"
+    cloud.google.com/backend-config: '{"default": "learning-platform-backend-config"}'
+spec:
+  rules:
+  - host: learning-platform.example.com
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: learning-platform-service
+            port:
+              number: 80
+  - host: www.learning-platform.example.com
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: learning-platform-service
+            port:
+              number: 80
+
+---
+# Backend Configuration for Load Balancer
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: learning-platform-backend-config
+  namespace: learning-platform
+spec:
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 60
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /api/health
+    port: 3000
+  cdn:
+    enabled: true
+    cachePolicy:
+      includeHost: true
+      includeProtocol: true
+      includeQueryString: false
+    cacheMode: CACHE_ALL_STATIC
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600
+
+---
+# Network Policy for Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: learning-platform-network-policy
+  namespace: learning-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: learning-platform
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: istio-system
+    ports:
+    - protocol: TCP
+      port: 3000
+  - from: []  # Allow from anywhere for HTTP traffic
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to: []  # Allow all outbound traffic
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 80    # HTTP
+    - protocol: UDP
+      port: 53    # DNS
+
+---
+# Resource Quotas
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: learning-platform-quota
+  namespace: learning-platform
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    pods: "50"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    persistentvolumeclaims: "10"
+
+---
+# Priority Class for Critical Pods
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: learning-platform-critical
+value: 1000
+globalDefault: false
+description: "Priority class for critical learning platform components"
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: learning-platform-metrics
+  namespace: learning-platform
+  labels:
+    app: learning-platform
+spec:
+  selector:
+    matchLabels:
+      app: learning-platform
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

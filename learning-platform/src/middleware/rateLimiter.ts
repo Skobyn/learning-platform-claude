@@ -74,15 +74,20 @@ class RateLimiter {
         this.config.onLimitReached(request, identifier);
       }
 
-      return {
+      const result: RateLimitInfo = {
         allowed,
         limit: this.config.maxRequests,
         remaining,
         resetTime,
-        retryAfter: allowed ? undefined : Math.ceil((resetTime - now) / 1000),
         identifier,
         windowStart,
       };
+      
+      if (!allowed) {
+        result.retryAfter = Math.ceil((resetTime - now) / 1000);
+      }
+      
+      return result;
     } catch (error) {
       console.error('Rate limit check error:', error);
       // In case of Redis error, allow the request to proceed
@@ -344,13 +349,18 @@ export class SlidingWindowRateLimiter {
       const remaining = Math.max(0, this.maxRequests - currentCount);
       const resetTime = now + this.windowMs;
 
-      return {
+      const result: RateLimitResult = {
         allowed,
         limit: this.maxRequests,
         remaining,
         resetTime,
-        retryAfter: allowed ? undefined : Math.ceil(this.windowMs / 1000),
       };
+      
+      if (!allowed) {
+        result.retryAfter = Math.ceil(this.windowMs / 1000);
+      }
+      
+      return result;
     } catch (error) {
       console.error('Sliding window rate limit error:', error);
       return {

@@ -1,0 +1,126 @@
+# Multi-stage Docker build optimized for production performance
+# Learning Platform - Production-ready container
+
+# ============================================================================
+# BASE IMAGE WITH SECURITY AND PERFORMANCE OPTIMIZATIONS
+# ============================================================================
+FROM node:18-alpine AS base
+
+# Install security updates and required packages
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+        libc6-compat \
+        dumb-init \
+        curl \
+        ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Set working directory
+WORKDIR /app
+
+# ============================================================================
+# DEPENDENCY INSTALLATION STAGE
+# ============================================================================
+FROM base AS deps
+
+# Copy package files
+COPY package*.json ./
+COPY prisma/schema.prisma ./prisma/
+
+# Configure npm for production optimizations
+RUN npm config set fund false && \
+    npm config set audit false && \
+    npm config set progress false && \
+    npm config set loglevel warn
+
+# Install dependencies with optimizations
+RUN --mount=type=cache,target=/root/.npm \
+    if [ -f package-lock.json ]; then \
+        npm ci --omit=dev --frozen-lockfile --prefer-offline; \
+    else \
+        npm install --omit=dev --prefer-offline; \
+    fi
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# ============================================================================
+# BUILD STAGE WITH OPTIMIZATIONS
+# ============================================================================
+FROM base AS builder
+
+WORKDIR /app
+
+# Copy installed dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy source code
+COPY . .
+
+# Build optimizations
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=1
+
+# Build the application with optimizations
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
+
+# ============================================================================
+# PRODUCTION RUNTIME STAGE
+# ============================================================================
+FROM base AS runner
+
+WORKDIR /app
+
+# Set production environment
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=2048 --no-experimental-fetch"
+
+# Performance optimizations
+ENV UV_THREADPOOL_SIZE=128
+ENV MALLOC_ARENA_MAX=2
+
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Create necessary directories with correct permissions
+RUN mkdir -p .next && \
+    chown -R nextjs:nodejs .next && \
+    mkdir -p /tmp/cache && \
+    chown -R nextjs:nodejs /tmp/cache
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check with optimized settings
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "server.js"]
+
+# ============================================================================
+# LABELS FOR CONTAINER METADATA
+# ============================================================================
+LABEL maintainer="Learning Platform Team"
+LABEL version="1.0.0"
+LABEL description="Optimized Learning Platform container"
+LABEL org.opencontainers.image.source="https://github.com/learning-platform/app"

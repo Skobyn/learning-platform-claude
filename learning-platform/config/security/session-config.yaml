@@ -1,0 +1,208 @@
+# Session Security Configuration
+# Comprehensive session management settings for maximum security
+
+session:
+  # Session storage configuration
+  storage:
+    type: "redis" # Use Redis for session storage
+    connection:
+      host: "localhost"
+      port: 6379
+      db: 1 # Dedicated database for sessions
+      password_env: "REDIS_SESSION_PASSWORD"
+    
+    # Session key configuration
+    key_prefix: "lms:session:"
+    key_generator: "uuid_v4"
+  
+  # Cookie configuration
+  cookie:
+    name: "sessionId"
+    
+    # Security attributes
+    http_only: true # Prevent XSS access to session cookie
+    secure: true # Only send over HTTPS
+    same_site: "strict" # CSRF protection
+    
+    # Domain and path
+    domain: ".rdspos.com"
+    path: "/"
+    
+    # Expiration
+    max_age: 3600 # 1 hour in seconds
+    expires: null # Use max_age instead
+  
+  # Session lifecycle
+  lifecycle:
+    # Session duration
+    idle_timeout: 1800 # 30 minutes of inactivity
+    absolute_timeout: 7200 # 2 hours maximum session length
+    
+    # Session regeneration
+    regenerate_on_login: true
+    regenerate_interval: 900 # 15 minutes
+    
+    # Cleanup
+    cleanup_interval: 300 # 5 minutes
+    expired_session_cleanup: true
+
+  # Session data encryption
+  encryption:
+    enabled: true
+    algorithm: "aes-256-gcm"
+    key_env: "SESSION_ENCRYPTION_KEY"
+    key_rotation:
+      enabled: true
+      interval: 86400 # 24 hours
+      keep_old_keys: 2
+
+  # Security features
+  security:
+    # IP address validation
+    ip_validation:
+      enabled: true
+      strict_mode: false # Allow minor IP changes (mobile networks)
+      whitelist_ranges: [] # Optional IP ranges to always allow
+    
+    # User agent validation
+    user_agent_validation:
+      enabled: true
+      strict_mode: false # Allow minor UA changes
+    
+    # Concurrent session limits
+    concurrent_sessions:
+      max_per_user: 3
+      action_on_exceeded: "terminate_oldest" # or "deny_new"
+    
+    # Session fixation prevention
+    prevent_fixation: true
+    
+    # CSRF protection
+    csrf:
+      enabled: true
+      token_name: "csrfToken"
+      header_name: "X-CSRF-Token"
+      token_length: 32
+      verify_origin: true
+
+# Authentication session configuration
+authentication:
+  # Login session
+  login:
+    # Failed login tracking
+    failed_login_tracking:
+      enabled: true
+      max_attempts: 5
+      lockout_duration: 900 # 15 minutes
+      reset_on_success: true
+    
+    # Remember me functionality
+    remember_me:
+      enabled: true
+      duration: 2592000 # 30 days
+      secure_cookie: true
+      regenerate_token: true
+  
+  # Two-factor authentication
+  two_factor:
+    session_duration: 300 # 5 minutes to complete 2FA
+    remember_device: true
+    remember_duration: 2592000 # 30 days
+    backup_codes: 10
+
+  # Password security
+  password:
+    # Password change requirements
+    require_current_password: true
+    invalidate_other_sessions: true
+    
+    # Password strength requirements
+    min_length: 12
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special_chars: true
+    
+    # Password history
+    prevent_reuse: true
+    history_count: 12
+
+# Multi-device support
+multi_device:
+  # Device fingerprinting
+  fingerprinting:
+    enabled: true
+    factors: ["user_agent", "screen_resolution", "timezone", "language"]
+    store_duration: 2592000 # 30 days
+  
+  # Device management
+  device_management:
+    enabled: true
+    max_devices: 10
+    require_approval_for_new: false
+    notify_on_new_device: true
+
+# Session monitoring and alerting
+monitoring:
+  # Suspicious activity detection
+  suspicious_activity:
+    enabled: true
+    
+    # Anomaly detection
+    detect_unusual_locations: true
+    detect_unusual_times: true
+    detect_concurrent_sessions: true
+    
+    # Response to suspicious activity
+    response:
+      require_reverification: true
+      send_security_alert: true
+      temporary_account_lock: false
+  
+  # Session analytics
+  analytics:
+    enabled: true
+    track_login_patterns: true
+    track_session_duration: true
+    track_page_views: false # Privacy consideration
+  
+  # Logging
+  logging:
+    log_session_events: true
+    log_failed_attempts: true
+    log_suspicious_activity: true
+    retention_days: 90
+
+# Environment-specific configurations
+environments:
+  production:
+    cookie:
+      secure: true
+      same_site: "strict"
+    encryption:
+      enabled: true
+    security:
+      ip_validation:
+        enabled: true
+        strict_mode: true
+  
+  development:
+    cookie:
+      secure: false # Allow HTTP for localhost
+      same_site: "lax"
+    lifecycle:
+      idle_timeout: 7200 # 2 hours for development
+    monitoring:
+      analytics:
+        enabled: false
+  
+  testing:
+    storage:
+      type: "memory" # Use in-memory storage for tests
+    lifecycle:
+      idle_timeout: 300 # 5 minutes for tests
+    security:
+      ip_validation:
+        enabled: false
+      user_agent_validation:
+        enabled: false

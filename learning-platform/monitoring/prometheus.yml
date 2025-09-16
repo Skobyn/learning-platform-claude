@@ -1,0 +1,149 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'learning-platform'
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # NGINX metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-streaming:80']
+    metrics_path: /nginx-status
+    scrape_interval: 10s
+
+  # Video processor services
+  - job_name: 'video-processor'
+    static_configs:
+      - targets: ['video-processor:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # FFmpeg workers
+  - job_name: 'ffmpeg-worker'
+    static_configs:
+      - targets: ['ffmpeg-worker:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Analytics service
+  - job_name: 'analytics-service'
+    static_configs:
+      - targets: ['analytics-service:3000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Kubernetes pods (if running on K8s)
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+# Recording rules for aggregation
+recording_rules:
+  - name: video.rules
+    rules:
+      - record: video:transcoding_rate_5m
+        expr: rate(video_transcoding_jobs_total[5m])
+
+      - record: video:streaming_rate_5m
+        expr: rate(video_streaming_sessions_total[5m])
+
+      - record: video:error_rate_5m
+        expr: rate(video_errors_total[5m])
+
+      - record: video:bandwidth_usage
+        expr: sum(rate(nginx_http_request_size_bytes[5m])) by (instance)
+
+# Alerting rules
+alerting_rules:
+  - name: video.alerts
+    rules:
+      - alert: HighTranscodingFailureRate
+        expr: rate(video_transcoding_jobs_failed_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High transcoding failure rate"
+          description: "Transcoding failure rate is {{ $value }} over the last 5 minutes"
+
+      - alert: VideoProcessorDown
+        expr: up{job="video-processor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Video processor is down"
+          description: "Video processor {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) < 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is above 90% on {{ $labels.instance }}"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is not responding"
+
+      - alert: HighVideoStreamingLatency
+        expr: histogram_quantile(0.95, rate(video_streaming_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High video streaming latency"
+          description: "95th percentile latency is {{ $value }}s"

@@ -1,0 +1,690 @@
+{
+  "courses": {
+    "settings": {
+      "number_of_shards": 3,
+      "number_of_replicas": 1,
+      "index": {
+        "max_result_window": 50000,
+        "refresh_interval": "30s",
+        "analysis": {
+          "analyzer": {
+            "autocomplete_search": {
+              "tokenizer": "keyword",
+              "filter": ["lowercase", "trim"]
+            },
+            "autocomplete_index": {
+              "tokenizer": "autocomplete",
+              "filter": ["lowercase", "trim"]
+            },
+            "fuzzy_search": {
+              "tokenizer": "standard",
+              "filter": [
+                "lowercase",
+                "asciifolding",
+                "stop",
+                "snowball",
+                "trim"
+              ]
+            },
+            "content_analyzer": {
+              "tokenizer": "standard",
+              "filter": [
+                "lowercase",
+                "stop",
+                "snowball",
+                "stemmer"
+              ]
+            },
+            "exact_match": {
+              "tokenizer": "keyword",
+              "filter": ["lowercase", "trim"]
+            }
+          },
+          "tokenizer": {
+            "autocomplete": {
+              "type": "edge_ngram",
+              "min_gram": 2,
+              "max_gram": 20,
+              "token_chars": ["letter", "digit"]
+            }
+          },
+          "filter": {
+            "stemmer": {
+              "type": "stemmer",
+              "language": "english"
+            },
+            "stop": {
+              "type": "stop",
+              "stopwords": "_english_"
+            },
+            "snowball": {
+              "type": "snowball",
+              "language": "English"
+            }
+          }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "id": {
+          "type": "keyword",
+          "index": true
+        },
+        "title": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "search_analyzer": "content_analyzer",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete_index",
+              "search_analyzer": "autocomplete_search"
+            },
+            "fuzzy": {
+              "type": "text",
+              "analyzer": "fuzzy_search"
+            },
+            "exact": {
+              "type": "text",
+              "analyzer": "exact_match"
+            },
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "description": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete_index",
+              "search_analyzer": "autocomplete_search"
+            }
+          }
+        },
+        "content": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "index_options": "offsets"
+        },
+        "category": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            }
+          }
+        },
+        "subcategory": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            }
+          }
+        },
+        "skillLevel": {
+          "type": "keyword"
+        },
+        "duration": {
+          "type": "integer",
+          "index": true
+        },
+        "price": {
+          "type": "scaled_float",
+          "scaling_factor": 100
+        },
+        "rating": {
+          "type": "float"
+        },
+        "reviewCount": {
+          "type": "integer"
+        },
+        "enrollmentCount": {
+          "type": "integer"
+        },
+        "instructor": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "keyword"
+            },
+            "name": {
+              "type": "text",
+              "analyzer": "content_analyzer",
+              "fields": {
+                "keyword": {
+                  "type": "keyword"
+                },
+                "autocomplete": {
+                  "type": "text",
+                  "analyzer": "autocomplete_index",
+                  "search_analyzer": "autocomplete_search"
+                }
+              }
+            },
+            "rating": {
+              "type": "float"
+            }
+          }
+        },
+        "tags": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            }
+          }
+        },
+        "language": {
+          "type": "keyword"
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "updatedAt": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "popularity_score": {
+          "type": "float"
+        },
+        "completion_rate": {
+          "type": "float"
+        },
+        "thumbnail": {
+          "type": "keyword",
+          "index": false
+        },
+        "video_duration": {
+          "type": "integer"
+        },
+        "difficulty_score": {
+          "type": "float"
+        },
+        "prerequisites": {
+          "type": "text",
+          "analyzer": "content_analyzer"
+        },
+        "learning_objectives": {
+          "type": "text",
+          "analyzer": "content_analyzer"
+        },
+        "certificate_available": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "lessons": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1,
+      "index": {
+        "max_result_window": 10000,
+        "refresh_interval": "30s",
+        "analysis": {
+          "analyzer": {
+            "content_analyzer": {
+              "tokenizer": "standard",
+              "filter": [
+                "lowercase",
+                "stop",
+                "snowball"
+              ]
+            },
+            "autocomplete_search": {
+              "tokenizer": "keyword",
+              "filter": ["lowercase", "trim"]
+            },
+            "autocomplete_index": {
+              "tokenizer": "autocomplete",
+              "filter": ["lowercase", "trim"]
+            }
+          },
+          "tokenizer": {
+            "autocomplete": {
+              "type": "edge_ngram",
+              "min_gram": 2,
+              "max_gram": 20,
+              "token_chars": ["letter", "digit"]
+            }
+          }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "courseId": {
+          "type": "keyword"
+        },
+        "title": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete_index",
+              "search_analyzer": "autocomplete_search"
+            },
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "content": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "index_options": "offsets"
+        },
+        "transcript": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "index_options": "offsets"
+        },
+        "duration": {
+          "type": "integer"
+        },
+        "lessonType": {
+          "type": "keyword"
+        },
+        "order": {
+          "type": "integer"
+        },
+        "isPreview": {
+          "type": "boolean"
+        },
+        "attachments": {
+          "type": "nested",
+          "properties": {
+            "name": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            },
+            "type": {
+              "type": "keyword"
+            },
+            "url": {
+              "type": "keyword",
+              "index": false
+            },
+            "size": {
+              "type": "long"
+            }
+          }
+        },
+        "video_url": {
+          "type": "keyword",
+          "index": false
+        },
+        "slides_url": {
+          "type": "keyword",
+          "index": false
+        },
+        "quiz_id": {
+          "type": "keyword"
+        },
+        "completion_time_avg": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  "resources": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1,
+      "index": {
+        "max_result_window": 10000,
+        "refresh_interval": "30s",
+        "analysis": {
+          "analyzer": {
+            "content_analyzer": {
+              "tokenizer": "standard",
+              "filter": [
+                "lowercase",
+                "stop",
+                "snowball"
+              ]
+            },
+            "autocomplete_search": {
+              "tokenizer": "keyword",
+              "filter": ["lowercase", "trim"]
+            },
+            "autocomplete_index": {
+              "tokenizer": "autocomplete",
+              "filter": ["lowercase", "trim"]
+            }
+          },
+          "tokenizer": {
+            "autocomplete": {
+              "type": "edge_ngram",
+              "min_gram": 2,
+              "max_gram": 20,
+              "token_chars": ["letter", "digit"]
+            }
+          }
+        }
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "title": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "fields": {
+            "autocomplete": {
+              "type": "text",
+              "analyzer": "autocomplete_index",
+              "search_analyzer": "autocomplete_search"
+            },
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "description": {
+          "type": "text",
+          "analyzer": "content_analyzer"
+        },
+        "content": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "index_options": "offsets"
+        },
+        "type": {
+          "type": "keyword"
+        },
+        "category": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            }
+          }
+        },
+        "tags": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "content_analyzer"
+            }
+          }
+        },
+        "downloadCount": {
+          "type": "integer"
+        },
+        "rating": {
+          "type": "float"
+        },
+        "fileSize": {
+          "type": "long"
+        },
+        "format": {
+          "type": "keyword"
+        },
+        "url": {
+          "type": "keyword",
+          "index": false
+        },
+        "author": {
+          "type": "text",
+          "analyzer": "content_analyzer",
+          "fields": {
+            "keyword": {
+              "type": "keyword"
+            }
+          }
+        },
+        "version": {
+          "type": "keyword"
+        },
+        "license": {
+          "type": "keyword"
+        },
+        "createdAt": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "updatedAt": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        }
+      }
+    }
+  },
+  "users": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index": {
+        "max_result_window": 10000,
+        "refresh_interval": "60s"
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "id": {
+          "type": "keyword"
+        },
+        "username": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text",
+              "analyzer": "standard"
+            }
+          }
+        },
+        "email": {
+          "type": "keyword"
+        },
+        "profile": {
+          "type": "object",
+          "properties": {
+            "interests": {
+              "type": "keyword"
+            },
+            "skillLevel": {
+              "type": "keyword"
+            },
+            "preferredCategories": {
+              "type": "keyword"
+            },
+            "learning_goals": {
+              "type": "text",
+              "analyzer": "standard"
+            },
+            "experience_level": {
+              "type": "keyword"
+            }
+          }
+        },
+        "searchHistory": {
+          "type": "nested",
+          "properties": {
+            "query": {
+              "type": "text",
+              "analyzer": "standard"
+            },
+            "timestamp": {
+              "type": "date"
+            },
+            "results_clicked": {
+              "type": "keyword"
+            },
+            "session_id": {
+              "type": "keyword"
+            }
+          }
+        },
+        "enrolledCourses": {
+          "type": "keyword"
+        },
+        "completedCourses": {
+          "type": "keyword"
+        },
+        "wishlistedCourses": {
+          "type": "keyword"
+        },
+        "purchase_history": {
+          "type": "nested",
+          "properties": {
+            "course_id": {
+              "type": "keyword"
+            },
+            "purchased_at": {
+              "type": "date"
+            },
+            "price": {
+              "type": "scaled_float",
+              "scaling_factor": 100
+            }
+          }
+        },
+        "learning_preferences": {
+          "type": "object",
+          "properties": {
+            "video_speed": {
+              "type": "float"
+            },
+            "preferred_duration": {
+              "type": "integer"
+            },
+            "difficulty_preference": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  },
+  "search_analytics": {
+    "settings": {
+      "number_of_shards": 2,
+      "number_of_replicas": 0,
+      "index": {
+        "refresh_interval": "5s"
+      }
+    },
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "query": {
+          "type": "text",
+          "analyzer": "standard"
+        },
+        "normalized_query": {
+          "type": "keyword"
+        },
+        "user_id": {
+          "type": "keyword"
+        },
+        "session_id": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date"
+        },
+        "results_count": {
+          "type": "integer"
+        },
+        "clicked_results": {
+          "type": "keyword"
+        },
+        "filters_applied": {
+          "type": "object",
+          "dynamic": true,
+          "properties": {
+            "category": {
+              "type": "keyword"
+            },
+            "skillLevel": {
+              "type": "keyword"
+            },
+            "duration": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "integer"
+                },
+                "max": {
+                  "type": "integer"
+                }
+              }
+            },
+            "price": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "float"
+                },
+                "max": {
+                  "type": "float"
+                }
+              }
+            },
+            "rating": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "float"
+                }
+              }
+            }
+          }
+        },
+        "response_time": {
+          "type": "integer"
+        },
+        "no_results": {
+          "type": "boolean"
+        },
+        "page_number": {
+          "type": "integer"
+        },
+        "sort_by": {
+          "type": "keyword"
+        },
+        "personalized": {
+          "type": "boolean"
+        },
+        "device_type": {
+          "type": "keyword"
+        },
+        "user_agent": {
+          "type": "text",
+          "index": false
+        },
+        "ip_address": {
+          "type": "ip"
+        },
+        "geo_location": {
+          "type": "geo_point"
+        }
+      }
+    }
+  }
+}

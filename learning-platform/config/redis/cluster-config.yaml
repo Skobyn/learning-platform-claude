@@ -1,0 +1,221 @@
+# Redis Cluster Configuration for Learning Platform
+# Supports 50K concurrent sessions with automatic failover
+
+version: '3.8'
+
+# Redis Cluster Nodes Configuration
+nodes:
+  # Master Nodes
+  master-1:
+    port: 7001
+    cluster-enabled: true
+    cluster-config-file: nodes-7001.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+  master-2:
+    port: 7002
+    cluster-enabled: true
+    cluster-config-file: nodes-7002.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+  master-3:
+    port: 7003
+    cluster-enabled: true
+    cluster-config-file: nodes-7003.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+  # Replica Nodes
+  replica-1:
+    port: 7004
+    cluster-enabled: true
+    cluster-config-file: nodes-7004.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+  replica-2:
+    port: 7005
+    cluster-enabled: true
+    cluster-config-file: nodes-7005.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+  replica-3:
+    port: 7006
+    cluster-enabled: true
+    cluster-config-file: nodes-7006.conf
+    cluster-node-timeout: 5000
+    appendonly: true
+    appendfsync: everysec
+    save: "900 1 300 10 60 10000"
+    maxmemory: 2gb
+    maxmemory-policy: allkeys-lru
+    tcp-keepalive: 300
+    timeout: 0
+    tcp-backlog: 511
+    databases: 1
+
+# Cluster Settings
+cluster:
+  replicas: 1
+  replicas-migration-barrier: 1
+  require-full-coverage: true
+  allow-reads-when-down: false
+
+# Connection Settings
+connection:
+  max-connections: 10000
+  max-clients: 10000
+
+# Performance Tuning
+performance:
+  hash-max-ziplist-entries: 512
+  hash-max-ziplist-value: 64
+  list-max-ziplist-size: -2
+  list-compress-depth: 0
+  set-max-intset-entries: 512
+  zset-max-ziplist-entries: 128
+  zset-max-ziplist-value: 64
+  hll-sparse-max-bytes: 3000
+
+# Monitoring
+monitoring:
+  slowlog-log-slower-than: 10000
+  slowlog-max-len: 128
+  latency-monitor-threshold: 100
+
+# Security
+security:
+  protected-mode: false # Will be true in production with proper auth
+  requirepass: null # Set in production environment
+
+# Google Cloud Memorystore Production Configuration
+gcp-memorystore:
+  tier: STANDARD_HA
+  memory-size-gb: 12
+  location-id: us-central1-a
+  alternative-location-id: us-central1-b
+  redis-version: REDIS_6_X
+  display-name: "learning-platform-redis-cluster"
+  labels:
+    environment: production
+    application: learning-platform
+    team: backend
+  auth-enabled: true
+  transit-encryption-mode: SERVER_AUTHENTICATION
+  connect-mode: DIRECT_PEERING
+  persistence-config:
+    persistence-mode: RDB
+    rdb-snapshot-period: TWENTY_FOUR_HOURS
+    rdb-snapshot-start-time: "02:00"
+  maintenance-policy:
+    weekly-maintenance-window:
+      day: SUNDAY
+      start-time: "03:00"
+      duration: "PT4H"
+  read-replicas-mode: READ_REPLICAS_ENABLED
+  replica-count: 2
+
+# Cache Configuration
+cache:
+  # Cache Warming Settings
+  warming:
+    enabled: true
+    parallel-workers: 10
+    batch-size: 100
+    retry-attempts: 3
+    retry-delay: 1000
+
+  # Cache Patterns
+  patterns:
+    user-sessions:
+      prefix: "session:"
+      ttl: 86400 # 24 hours
+      pattern: "session:*"
+
+    user-profiles:
+      prefix: "user:"
+      ttl: 3600 # 1 hour
+      pattern: "user:*"
+
+    course-data:
+      prefix: "course:"
+      ttl: 7200 # 2 hours
+      pattern: "course:*"
+
+    quiz-data:
+      prefix: "quiz:"
+      ttl: 1800 # 30 minutes
+      pattern: "quiz:*"
+
+    analytics:
+      prefix: "analytics:"
+      ttl: 900 # 15 minutes
+      pattern: "analytics:*"
+
+    rate-limits:
+      prefix: "ratelimit:"
+      ttl: 3600 # 1 hour
+      pattern: "ratelimit:*"
+
+    distributed-locks:
+      prefix: "lock:"
+      ttl: 300 # 5 minutes
+      pattern: "lock:*"
+
+  # Invalidation Strategies
+  invalidation:
+    strategies:
+      - tag-based
+      - time-based
+      - event-driven
+      - dependency-based
+
+    events:
+      - user-update
+      - course-update
+      - quiz-completion
+      - enrollment-change
+      - settings-change

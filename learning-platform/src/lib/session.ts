@@ -1,5 +1,5 @@
-import { redis, generateCacheKey } from './redis';
-import { cacheService, CacheConfigs } from '@/services/cacheService';
+import { getRedisClient } from './redis-cluster';
+import { getCacheManager } from '../services/cache-manager';
 import { randomBytes, createHash } from 'crypto';
 import { sign, verify, JwtPayload } from 'jsonwebtoken';
 
@@ -33,6 +33,8 @@ export interface SessionValidationResult {
 }
 
 class SessionManager {
+  private readonly redis = getRedisClient();
+  private readonly cacheManager = getCacheManager();
   private readonly sessionSecret: string;
   private readonly csrfSecret: string;
   private readonly defaultMaxAge: number = 8 * 60 * 60 * 1000; // 8 hours
@@ -43,7 +45,7 @@ class SessionManager {
   constructor() {
     this.sessionSecret = process.env.NEXTAUTH_SECRET || process.env.SESSION_SECRET || 'default-session-secret';
     this.csrfSecret = process.env.CSRF_SECRET || 'default-csrf-secret';
-    
+
     if (this.sessionSecret === 'default-session-secret') {
       console.warn('Using default session secret - this is insecure for production!');
     }
@@ -67,11 +69,12 @@ class SessionManager {
       csrfToken,
     };
 
-    // Store session data in Redis
+    // Store session data in Redis using cache manager
     const sessionKey = this.buildSessionKey(sessionId);
-    await cacheService.set(sessionKey, fullSessionData, {
-      ...CacheConfigs.userSession,
-      ttl: options?.maxAge ? Math.floor(options.maxAge / 1000) : CacheConfigs.userSession.ttl,
+    await this.cacheManager.set(sessionKey, fullSessionData, {
+      ttl: options?.maxAge ? Math.floor(options.maxAge / 1000) : Math.floor(this.defaultMaxAge / 1000),
+      prefix: this.sessionPrefix,
+      tags: ['session', `user:${sessionData.userId}`],
     });
 
     // Track user's active sessions
@@ -103,7 +106,7 @@ class SessionManager {
 
       // Get session data from Redis
       const sessionKey = this.buildSessionKey(decoded.sessionId);
-      const sessionData = await cacheService.get<SessionData>(sessionKey);
+      const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
 
       if (!sessionData) {
         return { valid: false, reason: 'Session not found' };
@@ -131,7 +134,11 @@ class SessionManager {
         if (ipAddress) sessionData.ipAddress = ipAddress;
         if (userAgent) sessionData.userAgent = userAgent;
         
-        await cacheService.set(sessionKey, sessionData, CacheConfigs.userSession);
+        await this.cacheManager.set(sessionKey, sessionData, {
+          ttl: Math.floor(this.defaultMaxAge / 1000),
+          prefix: this.sessionPrefix,
+          tags: ['session', `user:${sessionData.userId}`],
+        });
       }
 
       return {
@@ -151,7 +158,7 @@ class SessionManager {
   async refreshSession(sessionId: string, updates?: Partial<SessionData>): Promise<boolean> {
     try {
       const sessionKey = this.buildSessionKey(sessionId);
-      const sessionData = await cacheService.get<SessionData>(sessionKey);
+      const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
 
       if (!sessionData) {
         return false;
@@ -163,7 +170,11 @@ class SessionManager {
         lastActivity: Date.now(),
       };
 
-      await cacheService.set(sessionKey, updatedSession, CacheConfigs.userSession);
+      await this.cacheManager.set(sessionKey, updatedSession, {
+        ttl: Math.floor(this.defaultMaxAge / 1000),
+        prefix: this.sessionPrefix,
+        tags: ['session', `user:${sessionData.userId}`],
+      });
       return true;
     } catch (error) {
       console.error('Session refresh error:', error);
@@ -177,15 +188,15 @@ class SessionManager {
   async destroySession(sessionId: string): Promise<boolean> {
     try {
       const sessionKey = this.buildSessionKey(sessionId);
-      const sessionData = await cacheService.get<SessionData>(sessionKey);
-      
+      const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
+
       if (sessionData) {
         // Remove from user's session list
         await this.removeUserSession(sessionData.userId, sessionId);
       }
 
       // Delete session data
-      await cacheService.delete(sessionKey);
+      await this.cacheManager.delete(sessionKey);
       return true;
     } catch (error) {
       console.error('Session destroy error:', error);
@@ -199,8 +210,8 @@ class SessionManager {
   async destroyUserSessions(userId: string): Promise<number> {
     try {
       const userSessionsKey = this.buildUserSessionsKey(userId);
-      const sessionIds = await redis.smembers(userSessionsKey);
-      
+      const sessionIds = await this.redis.smembers(userSessionsKey);
+
       let destroyedCount = 0;
       for (const sessionId of sessionIds) {
         const success = await this.destroySession(sessionId);
@@ -208,7 +219,7 @@ class SessionManager {
       }
 
       // Clear the user sessions set
-      await redis.del(userSessionsKey);
+      await this.redis.del(userSessionsKey);
       
       return destroyedCount;
     } catch (error) {
@@ -223,18 +234,18 @@ class SessionManager {
   async getUserSessions(userId: string): Promise<Array<{ sessionId: string; sessionData: SessionData }>> {
     try {
       const userSessionsKey = this.buildUserSessionsKey(userId);
-      const sessionIds = await redis.smembers(userSessionsKey);
-      
+      const sessionIds = await this.redis.smembers(userSessionsKey);
+
       const sessions = [];
       for (const sessionId of sessionIds) {
         const sessionKey = this.buildSessionKey(sessionId);
-        const sessionData = await cacheService.get<SessionData>(sessionKey);
-        
+        const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
+
         if (sessionData) {
           sessions.push({ sessionId, sessionData });
         } else {
           // Clean up orphaned session ID
-          await redis.srem(userSessionsKey, sessionId);
+          await this.redis.srem(userSessionsKey, sessionId);
         }
       }
       
@@ -258,7 +269,7 @@ class SessionManager {
   async regenerateCsrfToken(sessionId: string): Promise<string | null> {
     try {
       const sessionKey = this.buildSessionKey(sessionId);
-      const sessionData = await cacheService.get<SessionData>(sessionKey);
+      const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
 
       if (!sessionData) {
         return null;
@@ -267,7 +278,11 @@ class SessionManager {
       const newCsrfToken = this.generateCsrfToken();
       sessionData.csrfToken = newCsrfToken;
 
-      await cacheService.set(sessionKey, sessionData, CacheConfigs.userSession);
+      await this.cacheManager.set(sessionKey, sessionData, {
+        ttl: Math.floor(this.defaultMaxAge / 1000),
+        prefix: this.sessionPrefix,
+        tags: ['session', `user:${sessionData.userId}`],
+      });
       return newCsrfToken;
     } catch (error) {
       console.error('CSRF token regeneration error:', error);
@@ -281,14 +296,14 @@ class SessionManager {
   async cleanupExpiredSessions(): Promise<number> {
     try {
       const pattern = this.buildSessionKey('*');
-      const sessionKeys = await redis.keys(pattern);
-      
+      const sessionKeys = await this.redis.keys(pattern);
+
       let cleanedCount = 0;
       const now = Date.now();
-      
+
       for (const sessionKey of sessionKeys) {
-        const sessionData = await cacheService.get<SessionData>(sessionKey);
-        
+        const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
+
         if (sessionData && (now - sessionData.loginTime) > this.defaultMaxAge) {
           const sessionId = sessionKey.split(':').pop();
           if (sessionId) {
@@ -316,8 +331,8 @@ class SessionManager {
   }> {
     try {
       const pattern = this.buildSessionKey('*');
-      const sessionKeys = await redis.keys(pattern);
-      
+      const sessionKeys = await this.redis.keys(pattern);
+
       const stats = {
         totalActiveSessions: sessionKeys.length,
         sessionsPerUser: {} as Record<string, number>,
@@ -329,17 +344,17 @@ class SessionManager {
       const now = Date.now();
 
       for (const sessionKey of sessionKeys) {
-        const sessionData = await cacheService.get<SessionData>(sessionKey);
-        
+        const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
+
         if (sessionData) {
           // Count sessions per user
-          stats.sessionsPerUser[sessionData.userId] = 
+          stats.sessionsPerUser[sessionData.userId] =
             (stats.sessionsPerUser[sessionData.userId] || 0) + 1;
-          
+
           // Calculate session age
           const sessionAge = now - sessionData.loginTime;
           totalAge += sessionAge;
-          
+
           // Check if expired
           if (sessionAge > this.defaultMaxAge) {
             stats.expiredSessions++;
@@ -410,44 +425,44 @@ class SessionManager {
 
   private async addUserSession(userId: string, sessionId: string): Promise<void> {
     const userSessionsKey = this.buildUserSessionsKey(userId);
-    await redis.sadd(userSessionsKey, sessionId);
-    
+    await this.redis.sadd(userSessionsKey, sessionId);
+
     // Set expiration on the user sessions set
-    await redis.expire(userSessionsKey, CacheConfigs.userSession.ttl);
+    await this.redis.expire(userSessionsKey, Math.floor(this.defaultMaxAge / 1000));
   }
 
   private async removeUserSession(userId: string, sessionId: string): Promise<void> {
     const userSessionsKey = this.buildUserSessionsKey(userId);
-    await redis.srem(userSessionsKey, sessionId);
+    await this.redis.srem(userSessionsKey, sessionId);
   }
 
   private async enforceSessionLimits(userId: string): Promise<void> {
     const userSessionsKey = this.buildUserSessionsKey(userId);
-    const sessionIds = await redis.smembers(userSessionsKey);
-    
+    const sessionIds = await this.redis.smembers(userSessionsKey);
+
     if (sessionIds.length > this.maxConcurrentSessions) {
       // Get session details to find oldest sessions
       const sessionsWithData = [];
-      
+
       for (const sessionId of sessionIds) {
         const sessionKey = this.buildSessionKey(sessionId);
-        const sessionData = await cacheService.get<SessionData>(sessionKey);
-        
+        const sessionData = await this.cacheManager.get<SessionData>(sessionKey);
+
         if (sessionData) {
           sessionsWithData.push({ sessionId, sessionData });
         } else {
           // Clean up orphaned session
-          await redis.srem(userSessionsKey, sessionId);
+          await this.redis.srem(userSessionsKey, sessionId);
         }
       }
-      
+
       // Sort by last activity (oldest first)
       sessionsWithData.sort((a, b) => a.sessionData.lastActivity - b.sessionData.lastActivity);
-      
+
       // Remove excess sessions
       const sessionsToRemove = sessionsWithData.length - this.maxConcurrentSessions;
       for (let i = 0; i < sessionsToRemove; i++) {
-        await this.destroySession(sessionsWithData[i].sessionId);
+        await this.destroySession(sessionsWithData[i]?.sessionId!);
       }
     }
   }

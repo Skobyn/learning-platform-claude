@@ -5,12 +5,12 @@ import { createHash } from 'crypto';
 const redisConfig: RedisOptions = {
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
+  ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
   db: parseInt(process.env.REDIS_DB || '0'),
   
   // Connection pooling
   maxRetriesPerRequest: 3,
-  retryDelayOnFailover: 100,
+  // retryDelayOnFailover: 100, // This option doesn't exist
   enableReadyCheck: true,
   connectTimeout: 5000,
   commandTimeout: 5000,
@@ -155,7 +155,7 @@ class RedisManager {
     info: any;
   }> {
     const info = await this.client.info('memory');
-    const memory = await this.client.memory('stats');
+    const memory = await this.client.memory('STATS');
     
     return {
       connected: this.isConnected,

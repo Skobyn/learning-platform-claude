@@ -335,7 +335,7 @@ export function ReportGenerator() {
       type: reportForm.type!,
       fields: reportForm.fields || [],
       filters: reportForm.filters || [],
-      schedule: reportForm.schedule,
+      ...(reportForm.schedule && { schedule: reportForm.schedule }),
       createdBy: 'current-user',
       createdAt: selectedReport?.createdAt || new Date(),
       isActive: reportForm.isActive!
@@ -766,7 +766,7 @@ export function ReportGenerator() {
               <div>
                 <label className="block text-sm font-medium mb-2">Category</label>
                 <Select 
-                  value={reportForm.category} 
+                  value={reportForm.category || ''} 
                   onValueChange={(value: any) => setReportForm(prev => ({ ...prev, category: value }))}
                 >
                   <SelectTrigger>
@@ -797,7 +797,7 @@ export function ReportGenerator() {
               <div>
                 <label className="block text-sm font-medium mb-2">Report Type</label>
                 <Select 
-                  value={reportForm.type} 
+                  value={reportForm.type || ''} 
                   onValueChange={(value: any) => setReportForm(prev => ({ ...prev, type: value }))}
                 >
                   <SelectTrigger>
@@ -813,7 +813,7 @@ export function ReportGenerator() {
               <div className="flex items-end">
                 <label className="flex items-center space-x-2">
                   <Checkbox 
-                    checked={reportForm.isActive} 
+                    checked={reportForm.isActive || false} 
                     onCheckedChange={(checked) => setReportForm(prev => ({ ...prev, isActive: !!checked }))}
                   />
                   <span className="text-sm">Active</span>

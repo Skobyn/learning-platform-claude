@@ -1,0 +1,181 @@
+# Content Security Policy Configuration
+# Comprehensive CSP headers to prevent XSS and injection attacks
+
+csp:
+  # Base CSP directives
+  directives:
+    # Default source - restrict to self
+    default-src:
+      - "'self'"
+    
+    # Script sources - be very restrictive
+    script-src:
+      - "'self'"
+      - "'strict-dynamic'" # Allow dynamic script loading with nonce
+      - "https://apis.google.com" # Google APIs
+      - "https://www.gstatic.com" # Google static content
+      - "https://cdnjs.cloudflare.com" # CDN for libraries
+    
+    # Style sources
+    style-src:
+      - "'self'"
+      - "'unsafe-inline'" # Required for some CSS frameworks
+      - "https://fonts.googleapis.com"
+      - "https://cdnjs.cloudflare.com"
+    
+    # Image sources
+    img-src:
+      - "'self'"
+      - "data:" # Allow data URIs for small images
+      - "https://storage.googleapis.com" # GCS for user uploads
+      - "https://*.googleusercontent.com"
+    
+    # Font sources
+    font-src:
+      - "'self'"
+      - "https://fonts.gstatic.com"
+      - "https://cdnjs.cloudflare.com"
+    
+    # Connect sources (AJAX, fetch, WebSocket)
+    connect-src:
+      - "'self'"
+      - "https://api.rdspos.com"
+      - "https://*.googleapis.com"
+      - "wss://learning.rdspos.com" # WebSocket connections
+    
+    # Media sources (video, audio)
+    media-src:
+      - "'self'"
+      - "https://storage.googleapis.com"
+    
+    # Object sources (embed, object, applet)
+    object-src:
+      - "'none'" # Block all plugins
+    
+    # Frame sources
+    frame-src:
+      - "'self'"
+      - "https://www.youtube.com" # Embedded videos
+      - "https://player.vimeo.com" # Embedded videos
+    
+    # Child sources (for web workers)
+    child-src:
+      - "'self'"
+    
+    # Form action sources
+    form-action:
+      - "'self'"
+    
+    # Base URI restriction
+    base-uri:
+      - "'self'"
+    
+    # Upgrade insecure requests
+    upgrade-insecure-requests: true
+
+  # CSP reporting
+  reporting:
+    # Report URI for CSP violations
+    report-uri: "/api/security/csp-report"
+    
+    # Report-To header (modern replacement for report-uri)
+    report-to: "csp-endpoint"
+    
+    # Report only mode for testing
+    report_only: false
+  
+  # Nonce configuration for dynamic scripts
+  nonce:
+    enabled: true
+    length: 32
+    regenerate_per_request: true
+  
+  # Environment-specific policies
+  environments:
+    development:
+      # More permissive for development
+      script-src:
+        - "'self'"
+        - "'unsafe-eval'" # Allow eval for dev tools
+        - "localhost:*"
+        - "127.0.0.1:*"
+      
+      connect-src:
+        - "'self'"
+        - "localhost:*"
+        - "127.0.0.1:*"
+        - "ws://localhost:*"
+        - "wss://localhost:*"
+    
+    production:
+      # Strictest policy for production
+      block-all-mixed-content: true
+      require-sri-for: ["script", "style"]
+    
+    testing:
+      # Allow additional sources for testing
+      script-src:
+        - "'self'"
+        - "'unsafe-inline'" # For test frameworks
+
+# Feature Policy / Permissions Policy
+feature_policy:
+  # Geolocation
+  geolocation: "'none'"
+  
+  # Camera and microphone
+  camera: "'self'"
+  microphone: "'self'"
+  
+  # Payment
+  payment: "'self'"
+  
+  # USB and Bluetooth
+  usb: "'none'"
+  bluetooth: "'none'"
+  
+  # Accelerometer and gyroscope
+  accelerometer: "'none'"
+  gyroscope: "'none'"
+  
+  # Magnetometer
+  magnetometer: "'none'"
+  
+  # Full screen
+  fullscreen: "'self'"
+  
+  # Picture in picture
+  picture-in-picture: "'self'"
+
+# Additional Security Headers
+additional_headers:
+  # X-DNS-Prefetch-Control
+  dns_prefetch_control: "off"
+  
+  # Expect-CT (Certificate Transparency)
+  expect_ct:
+    enforce: true
+    max_age: 86400
+    report_uri: "/api/security/ct-report"
+  
+  # NEL (Network Error Logging)
+  nel:
+    report_to: "network-errors"
+    max_age: 2592000
+    include_subdomains: true
+    success_fraction: 0.1
+    failure_fraction: 1.0
+
+# CSP Violation Handling
+violation_handling:
+  # Log all violations
+  log_violations: true
+  
+  # Alert on critical violations
+  alert_threshold: 10 # violations per hour
+  
+  # Block requests on repeated violations
+  auto_block:
+    enabled: true
+    threshold: 50 # violations per IP per hour
+    block_duration: 3600 # 1 hour

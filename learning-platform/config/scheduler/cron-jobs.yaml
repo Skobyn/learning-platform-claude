@@ -1,0 +1,406 @@
+# Google Cloud Scheduler Configuration
+# Automated cron jobs for the learning platform
+
+# Daily course analytics aggregation
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: daily-analytics-aggregation
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "America/New_York"
+  description: "Aggregate daily course analytics and user progress"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/analytics/daily"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "daily-analytics",
+        "timestamp": "{{ .ScheduleTime }}",
+        "tasks": [
+          "aggregate_user_progress",
+          "calculate_course_completion_rates",
+          "update_learning_streaks",
+          "generate_daily_reports"
+        ]
+      }
+  retryConfig:
+    retryCount: 3
+    maxRetryDuration: 300s
+    minBackoffDuration: 5s
+    maxBackoffDuration: 60s
+    maxDoublings: 4
+
+---
+# Weekly certificate generation batch job
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: weekly-certificate-batch
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 1 * * 1"  # Weekly on Monday at 1 AM
+  timeZone: "America/New_York"
+  description: "Batch generate certificates for completed courses"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/certificates/batch"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "certificate-batch",
+        "timestamp": "{{ .ScheduleTime }}",
+        "batchSize": 100,
+        "filters": {
+          "completedSince": "7d",
+          "status": "pending"
+        }
+      }
+  retryConfig:
+    retryCount: 2
+    maxRetryDuration: 600s
+
+---
+# Hourly system health check
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: hourly-health-check
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 * * * *"  # Every hour
+  timeZone: "UTC"
+  description: "Comprehensive system health check and monitoring"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/health/comprehensive"
+    httpMethod: GET
+    headers:
+      X-Cron-Token: "your-cron-secret-token"
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 60s
+
+---
+# Database cleanup and optimization
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: nightly-db-cleanup
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  timeZone: "America/New_York"
+  description: "Database cleanup, optimization, and maintenance"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/database/cleanup"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "database-cleanup",
+        "timestamp": "{{ .ScheduleTime }}",
+        "tasks": [
+          "cleanup_expired_sessions",
+          "archive_old_logs",
+          "cleanup_temporary_files",
+          "update_search_indexes",
+          "vacuum_tables",
+          "update_statistics"
+        ],
+        "retentionPolicies": {
+          "sessions": "30d",
+          "logs": "90d",
+          "tempFiles": "7d",
+          "notifications": "60d"
+        }
+      }
+  retryConfig:
+    retryCount: 2
+    maxRetryDuration: 1800s  # 30 minutes
+
+---
+# Email digest notifications
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: daily-email-digest
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 9 * * *"  # Daily at 9 AM
+  timeZone: "America/New_York"
+  description: "Send daily learning digest emails to active users"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/notifications/digest"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "email-digest",
+        "timestamp": "{{ .ScheduleTime }}",
+        "digestType": "daily",
+        "targetUsers": "active",
+        "content": [
+          "progress_summary",
+          "upcoming_deadlines",
+          "recommended_courses",
+          "achievement_highlights"
+        ]
+      }
+  retryConfig:
+    retryCount: 2
+    maxRetryDuration: 300s
+
+---
+# Weekly progress reminders
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: weekly-progress-reminders
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 10 * * 3"  # Weekly on Wednesday at 10 AM
+  timeZone: "America/New_York"
+  description: "Send progress reminder emails to inactive learners"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/notifications/reminders"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "progress-reminders",
+        "timestamp": "{{ .ScheduleTime }}",
+        "targetUsers": "inactive",
+        "inactivityThreshold": "7d",
+        "reminderType": "gentle_nudge",
+        "personalization": true
+      }
+  retryConfig:
+    retryCount: 2
+    maxRetryDuration: 300s
+
+---
+# Monthly course recommendations update
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: monthly-recommendations-update
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 4 1 * *"  # Monthly on the 1st at 4 AM
+  timeZone: "America/New_York"
+  description: "Update course recommendations using ML models"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/ml/recommendations"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "recommendations-update",
+        "timestamp": "{{ .ScheduleTime }}",
+        "models": [
+          "collaborative_filtering",
+          "content_based",
+          "hybrid_recommendation"
+        ],
+        "updateScope": "all_users",
+        "batchSize": 1000
+      }
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 3600s  # 1 hour
+
+---
+# Quarterly data export and backup
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: quarterly-data-export
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 0 1 */3 *"  # Quarterly on the 1st at midnight
+  timeZone: "America/New_York"
+  description: "Export quarterly data for compliance and backup"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/export/quarterly"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "quarterly-export",
+        "timestamp": "{{ .ScheduleTime }}",
+        "exportTypes": [
+          "user_data",
+          "course_analytics",
+          "certificates",
+          "compliance_reports"
+        ],
+        "destination": "gs://learning-platform-backups/quarterly/",
+        "compression": true,
+        "encryption": true
+      }
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 7200s  # 2 hours
+
+---
+# Cache warming for popular content
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: cache-warming
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  timeZone: "UTC"
+  description: "Warm cache with popular course content"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/cache/warm"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "cache-warming",
+        "timestamp": "{{ .ScheduleTime }}",
+        "strategy": "popularity_based",
+        "content_types": [
+          "courses",
+          "modules",
+          "user_profiles",
+          "quiz_questions"
+        ],
+        "cache_duration": "1h"
+      }
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 180s
+
+---
+# Security scan and audit
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: weekly-security-scan
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 5 * * 0"  # Weekly on Sunday at 5 AM
+  timeZone: "America/New_York"
+  description: "Weekly security scan and audit"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/security/scan"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "security-scan",
+        "timestamp": "{{ .ScheduleTime }}",
+        "scan_types": [
+          "dependency_vulnerabilities",
+          "access_log_analysis",
+          "failed_login_attempts",
+          "suspicious_activities"
+        ],
+        "alert_threshold": "medium"
+      }
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 600s
+
+---
+# Quiz question pool refresh
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: quiz-pool-refresh
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 6 * * 1"  # Weekly on Monday at 6 AM
+  timeZone: "America/New_York"
+  description: "Refresh quiz question pools and analyze performance"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/quiz/refresh-pools"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "quiz-pool-refresh",
+        "timestamp": "{{ .ScheduleTime }}",
+        "tasks": [
+          "analyze_question_performance",
+          "identify_problematic_questions",
+          "refresh_question_pools",
+          "update_difficulty_ratings"
+        ],
+        "performance_threshold": 0.3
+      }
+  retryConfig:
+    retryCount: 2
+    maxRetryDuration: 900s
+
+---
+# Content freshness check
+apiVersion: cloudscheduler.cnrm.cloud.google.com/v1beta1
+kind: CloudSchedulerJob
+metadata:
+  name: content-freshness-check
+  namespace: learning-platform
+spec:
+  location: us-central1
+  schedule: "0 8 1 * *"  # Monthly on the 1st at 8 AM
+  timeZone: "America/New_York"
+  description: "Check and flag outdated course content"
+  httpTarget:
+    uri: "https://your-app.run.app/api/cron/content/freshness-check"
+    httpMethod: POST
+    headers:
+      Content-Type: application/json
+      X-Cron-Token: "your-cron-secret-token"
+    body: |
+      {
+        "job": "content-freshness-check",
+        "timestamp": "{{ .ScheduleTime }}",
+        "staleness_threshold": "180d",
+        "check_types": [
+          "course_content",
+          "external_links",
+          "technology_references",
+          "compliance_requirements"
+        ],
+        "auto_flag": true,
+        "notify_instructors": true
+      }
+  retryConfig:
+    retryCount: 1
+    maxRetryDuration: 600s

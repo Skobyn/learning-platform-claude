@@ -1,0 +1,200 @@
+{
+  "measurement_id": "GA_MEASUREMENT_ID_PLACEHOLDER",
+  "stream_name": "learning-platform-web",
+  "custom_events": {
+    "learning_events": [
+      {
+        "event_name": "course_start",
+        "parameters": {
+          "course_id": "string",
+          "course_title": "string",
+          "course_category": "string",
+          "user_id": "string",
+          "user_role": "string",
+          "enrollment_type": "string"
+        },
+        "description": "User starts a new course"
+      },
+      {
+        "event_name": "lesson_complete",
+        "parameters": {
+          "course_id": "string",
+          "lesson_id": "string",
+          "lesson_title": "string",
+          "completion_time": "number",
+          "user_id": "string",
+          "progress_percentage": "number"
+        },
+        "description": "User completes a lesson within a course"
+      },
+      {
+        "event_name": "quiz_attempt",
+        "parameters": {
+          "course_id": "string",
+          "quiz_id": "string",
+          "quiz_title": "string",
+          "score": "number",
+          "max_score": "number",
+          "attempt_number": "number",
+          "user_id": "string"
+        },
+        "description": "User attempts a quiz"
+      },
+      {
+        "event_name": "course_complete",
+        "parameters": {
+          "course_id": "string",
+          "course_title": "string",
+          "course_category": "string",
+          "completion_time": "number",
+          "final_score": "number",
+          "user_id": "string",
+          "certificate_issued": "boolean"
+        },
+        "description": "User completes an entire course"
+      },
+      {
+        "event_name": "video_progress",
+        "parameters": {
+          "course_id": "string",
+          "lesson_id": "string",
+          "video_id": "string",
+          "progress_seconds": "number",
+          "total_duration": "number",
+          "playback_rate": "number",
+          "user_id": "string"
+        },
+        "description": "Video progress tracking"
+      }
+    ],
+    "engagement_events": [
+      {
+        "event_name": "search_performed",
+        "parameters": {
+          "search_term": "string",
+          "results_count": "number",
+          "filter_category": "string",
+          "user_id": "string"
+        },
+        "description": "User performs a search in the platform"
+      },
+      {
+        "event_name": "discussion_post",
+        "parameters": {
+          "course_id": "string",
+          "discussion_id": "string",
+          "post_type": "string",
+          "user_id": "string"
+        },
+        "description": "User posts in course discussions"
+      },
+      {
+        "event_name": "bookmark_added",
+        "parameters": {
+          "content_type": "string",
+          "content_id": "string",
+          "content_title": "string",
+          "user_id": "string"
+        },
+        "description": "User bookmarks content"
+      }
+    ],
+    "commerce_events": [
+      {
+        "event_name": "course_purchase",
+        "parameters": {
+          "transaction_id": "string",
+          "course_id": "string",
+          "course_title": "string",
+          "price": "number",
+          "currency": "string",
+          "payment_method": "string",
+          "user_id": "string"
+        },
+        "description": "User purchases a course"
+      },
+      {
+        "event_name": "subscription_start",
+        "parameters": {
+          "subscription_type": "string",
+          "plan_name": "string",
+          "price": "number",
+          "currency": "string",
+          "billing_cycle": "string",
+          "user_id": "string"
+        },
+        "description": "User starts a subscription"
+      }
+    ]
+  },
+  "custom_dimensions": [
+    {
+      "parameter_name": "user_role",
+      "display_name": "User Role",
+      "description": "Role of the user (student, instructor, admin)",
+      "scope": "USER"
+    },
+    {
+      "parameter_name": "course_category",
+      "display_name": "Course Category", 
+      "description": "Category of the course being accessed",
+      "scope": "EVENT"
+    },
+    {
+      "parameter_name": "enrollment_type",
+      "display_name": "Enrollment Type",
+      "description": "Type of enrollment (free, paid, trial)",
+      "scope": "EVENT"
+    },
+    {
+      "parameter_name": "device_type",
+      "display_name": "Device Type",
+      "description": "Type of device being used (desktop, tablet, mobile)",
+      "scope": "EVENT"
+    }
+  ],
+  "conversion_goals": [
+    {
+      "goal_name": "Course Completion",
+      "event_name": "course_complete",
+      "value": 10.0,
+      "description": "User successfully completes a course"
+    },
+    {
+      "goal_name": "Course Purchase",
+      "event_name": "course_purchase", 
+      "value": 50.0,
+      "description": "User purchases a course"
+    },
+    {
+      "goal_name": "Subscription Start",
+      "event_name": "subscription_start",
+      "value": 100.0,
+      "description": "User starts a paid subscription"
+    }
+  ],
+  "audiences": [
+    {
+      "name": "Active Learners",
+      "description": "Users who have completed at least one lesson in the past 30 days",
+      "criteria": "event_name = 'lesson_complete' within last 30 days"
+    },
+    {
+      "name": "Course Completers",
+      "description": "Users who have completed at least one full course",
+      "criteria": "event_name = 'course_complete'"
+    },
+    {
+      "name": "Premium Users",
+      "description": "Users with paid subscriptions or course purchases",
+      "criteria": "event_name = 'course_purchase' OR event_name = 'subscription_start'"
+    }
+  ],
+  "enhanced_ecommerce": {
+    "enabled": true,
+    "currency": "USD",
+    "track_purchases": true,
+    "track_refunds": true,
+    "track_subscriptions": true
+  }
+}

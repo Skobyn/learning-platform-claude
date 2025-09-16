@@ -1,0 +1,151 @@
+{
+  "metrics": [
+    {
+      "name": "learning_platform_user_logins",
+      "description": "Count of successful user login events",
+      "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.event=\"user_login\" AND jsonPayload.status=\"success\"",
+      "metricDescriptor": {
+        "metricKind": "GAUGE",
+        "valueType": "INT64",
+        "unit": "1",
+        "labels": [
+          {
+            "key": "user_role",
+            "valueType": "STRING",
+            "description": "Role of the logged in user"
+          },
+          {
+            "key": "login_method",
+            "valueType": "STRING",
+            "description": "Authentication method used"
+          }
+        ]
+      },
+      "labelExtractors": {
+        "user_role": "EXTRACT(jsonPayload.user_role)",
+        "login_method": "EXTRACT(jsonPayload.login_method)"
+      },
+      "bucketOptions": {
+        "linearBuckets": {
+          "numFiniteBuckets": 10,
+          "width": 1.0,
+          "offset": 0.0
+        }
+      }
+    },
+    {
+      "name": "learning_platform_course_completions",
+      "description": "Count of course completion events",
+      "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.event=\"course_completed\"",
+      "metricDescriptor": {
+        "metricKind": "GAUGE",
+        "valueType": "INT64",
+        "unit": "1",
+        "labels": [
+          {
+            "key": "course_category",
+            "valueType": "STRING",
+            "description": "Category of the completed course"
+          },
+          {
+            "key": "completion_time",
+            "valueType": "STRING",
+            "description": "Time taken to complete course"
+          }
+        ]
+      },
+      "labelExtractors": {
+        "course_category": "EXTRACT(jsonPayload.course_category)",
+        "completion_time": "EXTRACT(jsonPayload.completion_time)"
+      }
+    },
+    {
+      "name": "learning_platform_api_errors",
+      "description": "Count of API error responses by endpoint and error type",
+      "filter": "resource.type=\"cloud_run_revision\" AND httpRequest.status>=400",
+      "metricDescriptor": {
+        "metricKind": "GAUGE",
+        "valueType": "INT64",
+        "unit": "1",
+        "labels": [
+          {
+            "key": "endpoint",
+            "valueType": "STRING",
+            "description": "API endpoint that generated the error"
+          },
+          {
+            "key": "error_code",
+            "valueType": "STRING",
+            "description": "HTTP status code"
+          },
+          {
+            "key": "error_type",
+            "valueType": "STRING",
+            "description": "Type of error (validation, auth, server, etc.)"
+          }
+        ]
+      },
+      "labelExtractors": {
+        "endpoint": "EXTRACT(httpRequest.requestUrl)",
+        "error_code": "EXTRACT(httpRequest.status)",
+        "error_type": "EXTRACT(jsonPayload.error_type)"
+      }
+    },
+    {
+      "name": "learning_platform_database_operations",
+      "description": "Database operation performance and errors",
+      "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.component=\"database\"",
+      "metricDescriptor": {
+        "metricKind": "GAUGE",
+        "valueType": "DOUBLE",
+        "unit": "ms",
+        "labels": [
+          {
+            "key": "operation_type",
+            "valueType": "STRING",
+            "description": "Type of database operation (SELECT, INSERT, UPDATE, DELETE)"
+          },
+          {
+            "key": "table_name",
+            "valueType": "STRING",
+            "description": "Database table being accessed"
+          },
+          {
+            "key": "success",
+            "valueType": "STRING",
+            "description": "Whether the operation was successful"
+          }
+        ]
+      },
+      "labelExtractors": {
+        "operation_type": "EXTRACT(jsonPayload.operation_type)",
+        "table_name": "EXTRACT(jsonPayload.table_name)",
+        "success": "EXTRACT(jsonPayload.success)"
+      },
+      "valueExtractor": "EXTRACT(jsonPayload.duration_ms)"
+    }
+  ],
+  "log_sinks": [
+    {
+      "name": "learning-platform-errors",
+      "destination": "bigquery.googleapis.com/projects/PROJECT_ID/datasets/learning_platform_logs",
+      "filter": "resource.type=\"cloud_run_revision\" AND (severity=\"ERROR\" OR severity=\"CRITICAL\" OR httpRequest.status>=400)",
+      "description": "Export error logs to BigQuery for analysis",
+      "includeChildren": true
+    },
+    {
+      "name": "learning-platform-audit",
+      "destination": "storage.googleapis.com/learning-platform-audit-logs",
+      "filter": "resource.type=\"cloud_run_revision\" AND (jsonPayload.event=\"user_login\" OR jsonPayload.event=\"course_completed\" OR jsonPayload.event=\"admin_action\")",
+      "description": "Export audit logs to Cloud Storage for compliance",
+      "includeChildren": true
+    },
+    {
+      "name": "learning-platform-performance",
+      "destination": "pubsub.googleapis.com/projects/PROJECT_ID/topics/performance-metrics",
+      "filter": "resource.type=\"cloud_run_revision\" AND jsonPayload.component=\"performance\"",
+      "description": "Stream performance metrics to Pub/Sub for real-time analysis",
+      "includeChildren": false
+    }
+  ]
+}

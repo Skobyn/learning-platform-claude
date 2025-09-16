@@ -4,8 +4,8 @@ import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Course, CourseLevel, Enrollment } from '@/types'
 import { Clock, Users, BookOpen, Star, PlayCircle, CheckCircle2 } from 'lucide-react'
 
@@ -97,7 +97,7 @@ export default function CourseCard({
                       <span className="text-gray-600">Progress</span>
                       <span className="font-medium">{progress}%</span>
                     </div>
-                    <Progress value={progress} variant={getProgressVariant()} className="h-2" />
+                    <Progress value={progress} className="h-2" />
                   </div>
                 )}
               </div>
@@ -181,7 +181,7 @@ export default function CourseCard({
                 <span className="text-gray-600">Your Progress</span>
                 <span className="font-semibold text-gray-900">{progress}%</span>
               </div>
-              <Progress value={progress} variant={getProgressVariant()} className="h-2" />
+              <Progress value={progress} className="h-2" />
             </div>
           )}
         </CardContent>

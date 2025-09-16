@@ -1,0 +1,260 @@
+# Google Cloud Pub/Sub Configuration
+# Async processing setup for the learning platform
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pubsub-config
+  namespace: learning-platform
+data:
+  # Topic configurations
+  topics: |
+    # User events
+    - name: user-events
+      description: User registration, profile updates, and authentication events
+      messageRetentionDuration: 604800s  # 7 days
+      labels:
+        environment: production
+        component: user-management
+    
+    # Course events
+    - name: course-events
+      description: Course creation, updates, and enrollment events
+      messageRetentionDuration: 2592000s  # 30 days
+      labels:
+        environment: production
+        component: course-management
+    
+    # Learning progress events
+    - name: progress-events
+      description: Module completion, quiz submissions, and progress tracking
+      messageRetentionDuration: 7776000s  # 90 days
+      labels:
+        environment: production
+        component: progress-tracking
+    
+    # Notification events
+    - name: notification-events
+      description: Email notifications, push notifications, and announcements
+      messageRetentionDuration: 259200s  # 3 days
+      labels:
+        environment: production
+        component: notifications
+    
+    # Analytics events
+    - name: analytics-events
+      description: User behavior tracking and learning analytics
+      messageRetentionDuration: 31536000s  # 1 year
+      labels:
+        environment: production
+        component: analytics
+    
+    # Certificate events
+    - name: certificate-events
+      description: Certificate generation and validation events
+      messageRetentionDuration: 31536000s  # 1 year - permanent records
+      labels:
+        environment: production
+        component: certificates
+    
+    # Dead letter topics
+    - name: dead-letter-queue
+      description: Failed message processing
+      messageRetentionDuration: 2592000s  # 30 days
+      labels:
+        environment: production
+        component: error-handling
+
+  # Subscription configurations
+  subscriptions: |
+    # User event processors
+    - name: user-registration-processor
+      topic: user-events
+      filter: attributes.eventType="user.registered"
+      pushEndpoint: https://your-app.run.app/api/webhooks/user-registration
+      ackDeadline: 60s
+      messageRetentionDuration: 604800s
+      deadLetterTopic: dead-letter-queue
+      maxDeliveryAttempts: 5
+    
+    - name: user-profile-processor
+      topic: user-events
+      filter: attributes.eventType="user.profile.updated"
+      pushEndpoint: https://your-app.run.app/api/webhooks/user-profile
+      ackDeadline: 30s
+      messageRetentionDuration: 604800s
+    
+    # Course event processors
+    - name: course-enrollment-processor
+      topic: course-events
+      filter: attributes.eventType="course.enrolled"
+      pushEndpoint: https://your-app.run.app/api/webhooks/course-enrollment
+      ackDeadline: 60s
+      messageRetentionDuration: 2592000s
+      deadLetterTopic: dead-letter-queue
+      maxDeliveryAttempts: 3
+    
+    - name: course-completion-processor
+      topic: course-events
+      filter: attributes.eventType="course.completed"
+      pushEndpoint: https://your-app.run.app/api/webhooks/course-completion
+      ackDeadline: 120s  # Longer timeout for certificate generation
+      messageRetentionDuration: 2592000s
+    
+    # Progress tracking processors
+    - name: module-completion-processor
+      topic: progress-events
+      filter: attributes.eventType="module.completed"
+      pushEndpoint: https://your-app.run.app/api/webhooks/module-completion
+      ackDeadline: 30s
+      messageRetentionDuration: 7776000s
+    
+    - name: quiz-submission-processor
+      topic: progress-events
+      filter: attributes.eventType="quiz.submitted"
+      pushEndpoint: https://your-app.run.app/api/webhooks/quiz-submission
+      ackDeadline: 45s
+      messageRetentionDuration: 7776000s
+    
+    # Notification processors
+    - name: email-notification-processor
+      topic: notification-events
+      filter: attributes.channel="email"
+      pushEndpoint: https://your-app.run.app/api/webhooks/email-notification
+      ackDeadline: 60s
+      messageRetentionDuration: 259200s
+      deadLetterTopic: dead-letter-queue
+      maxDeliveryAttempts: 3
+    
+    - name: push-notification-processor
+      topic: notification-events
+      filter: attributes.channel="push"
+      pushEndpoint: https://your-app.run.app/api/webhooks/push-notification
+      ackDeadline: 30s
+      messageRetentionDuration: 259200s
+    
+    # Analytics processors
+    - name: learning-analytics-processor
+      topic: analytics-events
+      filter: attributes.category="learning"
+      pushEndpoint: https://your-app.run.app/api/webhooks/analytics
+      ackDeadline: 120s
+      messageRetentionDuration: 31536000s
+    
+    - name: user-behavior-processor
+      topic: analytics-events
+      filter: attributes.category="behavior"
+      pushEndpoint: https://your-app.run.app/api/webhooks/user-behavior
+      ackDeadline: 60s
+      messageRetentionDuration: 31536000s
+    
+    # Certificate processors
+    - name: certificate-generation-processor
+      topic: certificate-events
+      filter: attributes.eventType="certificate.requested"
+      pushEndpoint: https://your-app.run.app/api/webhooks/certificate-generation
+      ackDeadline: 300s  # 5 minutes for PDF generation
+      messageRetentionDuration: 31536000s
+      deadLetterTopic: dead-letter-queue
+      maxDeliveryAttempts: 2
+    
+    # Dead letter processor
+    - name: dead-letter-processor
+      topic: dead-letter-queue
+      pushEndpoint: https://your-app.run.app/api/webhooks/dead-letter
+      ackDeadline: 600s  # 10 minutes for manual inspection
+      messageRetentionDuration: 2592000s
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pubsub-publisher
+  namespace: learning-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pubsub-publisher
+  template:
+    metadata:
+      labels:
+        app: pubsub-publisher
+    spec:
+      serviceAccountName: pubsub-service-account
+      containers:
+      - name: publisher
+        image: gcr.io/PROJECT_ID/learning-platform:latest
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "PROJECT_ID"
+        - name: PUBSUB_EMULATOR_HOST
+          value: ""  # Use real Pub/Sub in production
+        - name: NODE_ENV
+          value: production
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pubsub-service-account
+  namespace: learning-platform
+  annotations:
+    iam.gke.io/gcp-service-account: learning-platform-pubsub@PROJECT_ID.iam.gserviceaccount.com
+
+---
+# Pub/Sub Topic Creation Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-pubsub-topics
+  namespace: learning-platform
+spec:
+  template:
+    spec:
+      serviceAccountName: pubsub-service-account
+      restartPolicy: OnFailure
+      containers:
+      - name: topic-creator
+        image: google/cloud-sdk:slim
+        command:
+        - /bin/bash
+        - -c
+        - |
+          # Create topics
+          gcloud pubsub topics create user-events || true
+          gcloud pubsub topics create course-events || true
+          gcloud pubsub topics create progress-events || true
+          gcloud pubsub topics create notification-events || true
+          gcloud pubsub topics create analytics-events || true
+          gcloud pubsub topics create certificate-events || true
+          gcloud pubsub topics create dead-letter-queue || true
+          
+          # Create subscriptions
+          gcloud pubsub subscriptions create user-registration-processor \
+            --topic=user-events \
+            --push-endpoint=https://your-app.run.app/api/webhooks/user-registration \
+            --ack-deadline=60 \
+            --dead-letter-topic=dead-letter-queue \
+            --max-delivery-attempts=5 || true
+          
+          gcloud pubsub subscriptions create course-enrollment-processor \
+            --topic=course-events \
+            --push-endpoint=https://your-app.run.app/api/webhooks/course-enrollment \
+            --ack-deadline=60 \
+            --dead-letter-topic=dead-letter-queue \
+            --max-delivery-attempts=3 || true
+          
+          # Add more subscription creation commands as needed
+          
+          echo "Pub/Sub topics and subscriptions created successfully"
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "PROJECT_ID"

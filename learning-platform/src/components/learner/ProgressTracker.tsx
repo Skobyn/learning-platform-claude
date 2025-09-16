@@ -2,8 +2,8 @@
 
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/Badge'
-import { Progress } from '@/components/ui/Progress'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { Enrollment, Course } from '@/types'
 import { TrendingUp, Clock, Target, Calendar, Award, BookOpen, CheckCircle2 } from 'lucide-react'
 
@@ -177,7 +177,6 @@ export function ProgressTracker({
               
               <Progress 
                 value={(weeklyProgress / weeklyGoal) * 100} 
-                variant={getWeeklyGoalVariant()}
                 className="h-3"
               />
               
@@ -254,7 +253,6 @@ export function ProgressTracker({
                     <div className="flex items-center gap-2 mt-1">
                       <Progress 
                         value={enrollment.progress} 
-                        variant={getProgressVariant(enrollment.progress)}
                         className="h-2 flex-1"
                       />
                       <span className="text-sm font-medium text-gray-600">

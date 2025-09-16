@@ -284,7 +284,7 @@ class CacheService {
       const dbSize = await redis.dbsize();
       
       const memoryMatch = info.match(/used_memory:(\d+)/);
-      const memoryUsed = memoryMatch ? parseInt(memoryMatch[1]) : 0;
+      const memoryUsed = memoryMatch?.[1] ? parseInt(memoryMatch[1]) : 0;
       
       const totalRequests = this.stats.hits + this.stats.misses;
       const hitRate = totalRequests > 0 ? this.stats.hits / totalRequests : 0;

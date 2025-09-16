@@ -1,0 +1,270 @@
+{
+  "application_performance_monitoring": {
+    "apm_service": "cloud-trace",
+    "trace_sampling_rate": 0.1,
+    "custom_spans": [
+      {
+        "name": "database_operations",
+        "description": "Track database query performance",
+        "attributes": [
+          "operation_type",
+          "table_name",
+          "query_duration",
+          "rows_affected"
+        ]
+      },
+      {
+        "name": "external_api_calls",
+        "description": "Track external API dependencies",
+        "attributes": [
+          "api_endpoint",
+          "response_time",
+          "status_code",
+          "retry_count"
+        ]
+      },
+      {
+        "name": "cache_operations",
+        "description": "Track cache hit/miss rates",
+        "attributes": [
+          "cache_key",
+          "cache_hit",
+          "operation_type",
+          "duration"
+        ]
+      },
+      {
+        "name": "user_authentication",
+        "description": "Track authentication performance",
+        "attributes": [
+          "auth_method",
+          "auth_duration",
+          "success",
+          "user_role"
+        ]
+      }
+    ]
+  },
+  "synthetic_monitoring": {
+    "enabled": true,
+    "checks": [
+      {
+        "name": "login_flow",
+        "type": "browser",
+        "frequency": "5m",
+        "locations": ["us-central1", "europe-west1", "asia-southeast1"],
+        "steps": [
+          {
+            "action": "navigate",
+            "url": "https://your-domain.com/login"
+          },
+          {
+            "action": "fill_form",
+            "selector": "#email",
+            "value": "monitor@example.com"
+          },
+          {
+            "action": "fill_form",
+            "selector": "#password",
+            "value": "monitoring_password"
+          },
+          {
+            "action": "click",
+            "selector": "#login-button"
+          },
+          {
+            "action": "wait_for_element",
+            "selector": ".dashboard",
+            "timeout": "10s"
+          }
+        ],
+        "assertions": [
+          {
+            "type": "response_time",
+            "threshold": "3s"
+          },
+          {
+            "type": "element_present",
+            "selector": ".dashboard"
+          }
+        ]
+      },
+      {
+        "name": "course_enrollment",
+        "type": "api",
+        "frequency": "10m",
+        "endpoint": "/api/courses/enroll",
+        "method": "POST",
+        "headers": {
+          "Authorization": "Bearer monitoring_token",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "course_id": "monitoring_course_123",
+          "user_id": "monitoring_user_456"
+        },
+        "assertions": [
+          {
+            "type": "status_code",
+            "expected": 200
+          },
+          {
+            "type": "response_time",
+            "threshold": "2s"
+          },
+          {
+            "type": "response_contains",
+            "text": "enrollment_successful"
+          }
+        ]
+      },
+      {
+        "name": "search_functionality",
+        "type": "api",
+        "frequency": "15m",
+        "endpoint": "/api/search",
+        "method": "GET",
+        "params": {
+          "q": "javascript",
+          "category": "technology",
+          "limit": "10"
+        },
+        "assertions": [
+          {
+            "type": "status_code",
+            "expected": 200
+          },
+          {
+            "type": "response_time",
+            "threshold": "1s"
+          },
+          {
+            "type": "json_path_exists",
+            "path": "$.results[0].id"
+          }
+        ]
+      }
+    ]
+  },
+  "real_user_monitoring": {
+    "enabled": true,
+    "metrics": [
+      {
+        "name": "page_load_time",
+        "description": "Track page load performance",
+        "type": "timing",
+        "collection_method": "navigation_timing_api"
+      },
+      {
+        "name": "first_contentful_paint",
+        "description": "Measure First Contentful Paint",
+        "type": "timing",
+        "collection_method": "paint_timing_api"
+      },
+      {
+        "name": "largest_contentful_paint",
+        "description": "Measure Largest Contentful Paint",
+        "type": "timing",
+        "collection_method": "largest_contentful_paint_api"
+      },
+      {
+        "name": "cumulative_layout_shift",
+        "description": "Measure layout stability",
+        "type": "score",
+        "collection_method": "layout_shift_api"
+      },
+      {
+        "name": "first_input_delay",
+        "description": "Measure input responsiveness",
+        "type": "timing",
+        "collection_method": "first_input_api"
+      }
+    ],
+    "sampling_rate": 0.05,
+    "exclude_paths": [
+      "/health",
+      "/metrics",
+      "/favicon.ico"
+    ]
+  },
+  "error_tracking": {
+    "enabled": true,
+    "integrations": [
+      {
+        "service": "cloud-error-reporting",
+        "config": {
+          "ignore_errors": [
+            "Network request failed",
+            "User cancelled request"
+          ],
+          "sample_rate": 1.0
+        }
+      }
+    ],
+    "custom_error_types": [
+      {
+        "name": "authentication_error",
+        "description": "Authentication and authorization failures",
+        "severity": "warning",
+        "auto_assign": "security_team"
+      },
+      {
+        "name": "database_error",
+        "description": "Database connection and query errors",
+        "severity": "error",
+        "auto_assign": "backend_team"
+      },
+      {
+        "name": "payment_error",
+        "description": "Payment processing failures",
+        "severity": "critical",
+        "auto_assign": "finance_team"
+      }
+    ]
+  },
+  "sla_monitoring": {
+    "slos": [
+      {
+        "name": "API Availability",
+        "description": "API should be available 99.9% of the time",
+        "target": 0.999,
+        "measurement_window": "30d",
+        "metric": "uptime_check_passed / uptime_check_total"
+      },
+      {
+        "name": "API Latency",
+        "description": "95% of API requests should complete within 2 seconds",
+        "target": 0.95,
+        "measurement_window": "30d",
+        "metric": "requests_under_2s / total_requests"
+      },
+      {
+        "name": "Error Rate",
+        "description": "Error rate should be less than 1%",
+        "target": 0.01,
+        "measurement_window": "30d",
+        "metric": "error_requests / total_requests",
+        "comparison": "less_than"
+      }
+    ],
+    "error_budgets": [
+      {
+        "slo": "API Availability",
+        "budget_period": "30d",
+        "consumption_tracking": true,
+        "alerts": [
+          {
+            "threshold": 0.5,
+            "severity": "warning",
+            "message": "50% of error budget consumed"
+          },
+          {
+            "threshold": 0.9,
+            "severity": "critical",
+            "message": "90% of error budget consumed - immediate action required"
+          }
+        ]
+      }
+    ]
+  }
+}
