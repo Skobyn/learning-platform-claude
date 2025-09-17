@@ -1,4 +1,4 @@
-import 'server-only';
+// Server-side only Redis client - removed 'server-only' for Vercel compatibility
 import Redis, { RedisOptions } from 'ioredis';
 import { createHash } from 'crypto';
 
