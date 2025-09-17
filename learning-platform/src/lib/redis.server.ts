@@ -3,11 +3,15 @@ import Redis, { RedisOptions } from 'ioredis';
 import { createHash } from 'crypto';
 
 // Redis connection configuration
-const redisConfig: RedisOptions = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
-  db: parseInt(process.env.REDIS_DB || '0'),
+const redisConfig: RedisOptions = process.env.REDIS_URL ?
+  // Use Redis URL if provided (Upstash, etc.)
+  process.env.REDIS_URL as any :
+  // Otherwise use individual connection params
+  {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379'),
+    ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
+    db: parseInt(process.env.REDIS_DB || '0'),
 
   // Connection pooling
   maxRetriesPerRequest: 3,
@@ -15,22 +19,23 @@ const redisConfig: RedisOptions = {
   connectTimeout: 5000,
   commandTimeout: 5000,
 
-  // Retry configuration
-  retryStrategy: (times: number) => {
-    if (times > 3) {
-      return null; // Stop retrying after 3 attempts
-    }
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
+    // Retry configuration
+    retryStrategy: (times: number) => {
+      if (times > 3) {
+        console.warn('Redis connection failed after 3 attempts');
+        return null; // Stop retrying after 3 attempts
+      }
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
 
-  // Connection pool settings
-  lazyConnect: true,
-  keepAlive: 30000,
+    // Connection pool settings
+    lazyConnect: true,
+    keepAlive: 30000,
 
-  // Key prefix for namespacing
-  keyPrefix: process.env.REDIS_KEY_PREFIX || 'learning-platform:',
-};
+    // Key prefix for namespacing
+    keyPrefix: process.env.REDIS_KEY_PREFIX || 'learning-platform:',
+  };
 
 // Create Redis instances
 class RedisManager {
@@ -200,10 +205,13 @@ export const deserializeFromCache = <T>(serialized: string): T | null => {
   }
 };
 
-// Connect to Redis when module is imported
-redisManager.connect().catch((error) => {
-  console.error('Failed to connect to Redis on startup:', error);
-});
+// Connect to Redis when module is imported (only if Redis is configured)
+if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+  redisManager.connect().catch((error) => {
+    console.error('Failed to connect to Redis on startup:', error);
+    console.warn('Application will continue without Redis caching');
+  });
+}
 
 // Graceful shutdown handler
 process.on('SIGTERM', async () => {

@@ -1,11 +1,22 @@
-# Minimal Cloud Run configuration
-service: learning-platform
 runtime: nodejs18
 
+instance_class: F4
+
 env_variables:
-  NODE_ENV: production
-  PORT: 8080
+  NODE_ENV: "production"
+  DATABASE_URL: "postgresql://user:password@localhost:5432/learning_platform"
+  NEXTAUTH_SECRET: "your-secret-key-change-in-production-minimum-32-chars"
+  NEXTAUTH_URL: "https://rds-lms.uc.r.appspot.com"
 
 automatic_scaling:
   min_instances: 1
   max_instances: 10
+
+handlers:
+- url: /_next/static
+  static_dir: .next/static
+  secure: always
+
+- url: /.*
+  script: auto
+  secure: always

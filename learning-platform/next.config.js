@@ -48,6 +48,22 @@ const nextConfig = {
       ...config.experiments,
       topLevelAwait: true,
     }
+
+    // Handle Node.js modules that don't work in the browser
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        dns: false,
+        tls: false,
+        fs: false,
+        path: false,
+        crypto: false,
+        stream: false,
+        os: false,
+      }
+    }
+
     return config
   },
   poweredByHeader: false,

@@ -269,3 +269,4 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 export default db;
+export { db as prisma };

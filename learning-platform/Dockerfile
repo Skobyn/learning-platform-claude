@@ -1,20 +1,21 @@
-# Minimal Dockerfile for Express.js deployment
-FROM node:18-alpine
+# Use pre-built base with Next.js
+FROM node:18
 
 WORKDIR /app
 
-# Install Express.js
-RUN npm init -y && npm install express
+# Copy only essential files
+COPY package*.json ./
+COPY .env ./
+COPY .next ./.next
+COPY public ./public
+COPY node_modules ./node_modules
+COPY prisma ./prisma
 
-# Copy the minimal app
-COPY minimal-app.js .
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
-
-# Start the application
-CMD ["node", "minimal-app.js"]
+# Start Next.js in production mode
+CMD ["npm", "start"]

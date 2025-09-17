@@ -733,3 +733,4 @@ class LearningPathService {
 }
 
 export const learningPathService = new LearningPathService();
+export default LearningPathService;

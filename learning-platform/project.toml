@@ -1,0 +1,7 @@
+[[build.env]]
+name = "GOOGLE_RUNTIME"
+value = "nodejs18"
+
+[[build.env]]
+name = "GOOGLE_ENTRYPOINT"
+value = "npm start"

@@ -445,3 +445,5 @@ export class RateLimitStats {
     }
   }
 }
+// Default export for middleware usage
+export const rateLimiter = new UserTierRateLimiter();

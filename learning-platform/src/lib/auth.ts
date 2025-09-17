@@ -240,6 +240,9 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
+// Export auth function for middleware
+export const auth = authOptions;
+
 // Custom JWT utilities
 export const jwtUtils = {
   sign: (payload: Record<string, any>, expiresIn: string | number = '24h') => {
