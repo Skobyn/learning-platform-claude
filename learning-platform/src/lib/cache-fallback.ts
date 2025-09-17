@@ -99,7 +99,13 @@ export function getCacheClient(): CacheClient {
     // Try to get Redis client if available
     try {
       const { redis } = require('./redis.server');
-      cacheClient = createCacheClient(redis);
+      // Only use Redis if it's actually available
+      if (redis && redis.status === 'ready') {
+        cacheClient = createCacheClient(redis);
+      } else {
+        console.log('Redis not ready, using in-memory cache');
+        cacheClient = new FallbackCache();
+      }
     } catch (error) {
       console.warn('Redis module not available, using in-memory cache');
       cacheClient = new FallbackCache();

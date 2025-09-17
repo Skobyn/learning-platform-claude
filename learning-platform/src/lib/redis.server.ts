@@ -2,9 +2,22 @@
 import Redis, { RedisOptions } from 'ioredis';
 import { createHash } from 'crypto';
 
+// Helper function to validate Redis URL
+function isValidRedisUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  // Check if it's a placeholder or invalid URL
+  if (url.includes('[') || url.includes(']')) return false;
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Redis connection configuration
-const redisConfig: RedisOptions = process.env.REDIS_URL ?
-  // Use Redis URL if provided (Upstash, etc.)
+const redisConfig: RedisOptions = (process.env.REDIS_URL && isValidRedisUrl(process.env.REDIS_URL)) ?
+  // Use Redis URL if provided and valid (Upstash, etc.)
   process.env.REDIS_URL as any :
   // Otherwise use individual connection params
   {
@@ -40,18 +53,33 @@ const redisConfig: RedisOptions = process.env.REDIS_URL ?
 // Create Redis instances
 class RedisManager {
   private static instance: RedisManager;
-  private client: Redis;
-  private subscriber: Redis;
-  private publisher: Redis;
+  private client: Redis | null = null;
+  private subscriber: Redis | null = null;
+  private publisher: Redis | null = null;
   private isConnected: boolean = false;
   private connectionPromise: Promise<void> | null = null;
+  private isRedisEnabled: boolean = false;
 
   private constructor() {
-    this.client = new Redis(redisConfig);
-    this.subscriber = new Redis(redisConfig);
-    this.publisher = new Redis(redisConfig);
+    // Only create Redis instances if Redis is properly configured
+    const hasValidRedis = (process.env.REDIS_URL && isValidRedisUrl(process.env.REDIS_URL)) ||
+                          process.env.REDIS_HOST;
 
-    this.setupEventHandlers();
+    if (hasValidRedis) {
+      try {
+        this.client = new Redis(redisConfig);
+        this.subscriber = new Redis(redisConfig);
+        this.publisher = new Redis(redisConfig);
+        this.isRedisEnabled = true;
+        this.setupEventHandlers();
+      } catch (error) {
+        console.warn('Failed to initialize Redis clients:', error);
+        this.isRedisEnabled = false;
+      }
+    } else {
+      console.log('Redis not configured, using in-memory cache fallback');
+      this.isRedisEnabled = false;
+    }
   }
 
   public static getInstance(): RedisManager {
@@ -62,6 +90,8 @@ class RedisManager {
   }
 
   private setupEventHandlers(): void {
+    if (!this.client || !this.subscriber || !this.publisher) return;
+
     // Main client event handlers
     this.client.on('connect', () => {
       console.log('Redis client connected');
@@ -94,6 +124,11 @@ class RedisManager {
   }
 
   public async connect(): Promise<void> {
+    if (!this.isRedisEnabled || !this.client || !this.subscriber || !this.publisher) {
+      console.log('Redis not enabled, skipping connection');
+      return;
+    }
+
     if (this.isConnected) {
       return;
     }
@@ -112,13 +147,16 @@ class RedisManager {
     }).catch((error) => {
       console.error('Failed to connect to Redis:', error);
       this.connectionPromise = null;
-      throw error;
+      this.isRedisEnabled = false;
+      // Don't throw, just disable Redis
     });
 
     return this.connectionPromise;
   }
 
   public async disconnect(): Promise<void> {
+    if (!this.client || !this.subscriber || !this.publisher) return;
+
     await Promise.all([
       this.client.disconnect(),
       this.subscriber.disconnect(),
@@ -128,19 +166,22 @@ class RedisManager {
     console.log('All Redis connections closed');
   }
 
-  public getClient(): Redis {
+  public getClient(): Redis | null {
     return this.client;
   }
 
-  public getSubscriber(): Redis {
+  public getSubscriber(): Redis | null {
     return this.subscriber;
   }
 
-  public getPublisher(): Redis {
+  public getPublisher(): Redis | null {
     return this.publisher;
   }
 
   public isHealthy(): boolean {
+    if (!this.isRedisEnabled || !this.client || !this.subscriber || !this.publisher) {
+      return false;
+    }
     return this.isConnected &&
            this.client.status === 'ready' &&
            this.subscriber.status === 'ready' &&
@@ -148,7 +189,12 @@ class RedisManager {
   }
 
   public async ping(): Promise<string> {
-    return await this.client.ping();
+    if (!this.client) return 'NO_REDIS';
+    try {
+      return await this.client.ping();
+    } catch {
+      return 'ERROR';
+    }
   }
 
   public async getStats(): Promise<{
@@ -159,24 +205,46 @@ class RedisManager {
     memory: any;
     info: any;
   }> {
-    const info = await this.client.info('memory');
-    const memory = await this.client.memory('STATS');
+    if (!this.client || !this.subscriber || !this.publisher) {
+      return {
+        connected: false,
+        clientStatus: 'disabled',
+        subscriberStatus: 'disabled',
+        publisherStatus: 'disabled',
+        memory: null,
+        info: null,
+      };
+    }
 
-    return {
-      connected: this.isConnected,
-      clientStatus: this.client.status,
-      subscriberStatus: this.subscriber.status,
-      publisherStatus: this.publisher.status,
-      memory,
-      info,
-    };
+    try {
+      const info = await this.client.info('memory');
+      const memory = await this.client.memory('STATS');
+
+      return {
+        connected: this.isConnected,
+        clientStatus: this.client.status,
+        subscriberStatus: this.subscriber.status,
+        publisherStatus: this.publisher.status,
+        memory,
+        info,
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        clientStatus: this.client?.status || 'error',
+        subscriberStatus: this.subscriber?.status || 'error',
+        publisherStatus: this.publisher?.status || 'error',
+        memory: null,
+        info: null,
+      };
+    }
   }
 }
 
 // Export Redis manager instance
 export const redisManager = RedisManager.getInstance();
 
-// Export individual clients for direct use
+// Export individual clients for direct use (may be null if Redis is not configured)
 export const redis = redisManager.getClient();
 export const redisSubscriber = redisManager.getSubscriber();
 export const redisPublisher = redisManager.getPublisher();
@@ -206,7 +274,10 @@ export const deserializeFromCache = <T>(serialized: string): T | null => {
 };
 
 // Connect to Redis when module is imported (only if Redis is configured)
-if (process.env.REDIS_URL || process.env.REDIS_HOST) {
+const hasValidRedis = (process.env.REDIS_URL && isValidRedisUrl(process.env.REDIS_URL)) ||
+                      process.env.REDIS_HOST;
+
+if (hasValidRedis) {
   redisManager.connect().catch((error) => {
     console.error('Failed to connect to Redis on startup:', error);
     console.warn('Application will continue without Redis caching');
