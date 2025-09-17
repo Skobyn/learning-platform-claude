@@ -1,0 +1,33 @@
+name: Vercel Preview URL Check
+
+on:
+  deployment_status:
+
+jobs:
+  update-preview-comment:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Find Comment
+        uses: peter-evans/find-comment@v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.deployment.payload.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Preview Deployment
+
+      - name: Update Comment
+        if: steps.fc.outputs.comment-id
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          body: |
+            🚀 **Preview Deployment Ready!**
+
+            Your changes have been deployed to: ${{ github.event.deployment_status.target_url }}
+
+            ✅ Deployment successful
+            🔍 [View deployment](${{ github.event.deployment_status.target_url }})
+            📊 [View logs](${{ github.event.deployment_status.log_url }})
+          edit-mode: replace

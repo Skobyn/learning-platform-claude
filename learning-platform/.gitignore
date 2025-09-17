@@ -31,6 +31,8 @@ yarn-error.log*
 
 # Vercel
 .vercel
+.vercel/*
+!.vercel/README.md
 
 # Typescript
 *.tsbuildinfo
